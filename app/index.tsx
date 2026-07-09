@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
+import { Screen } from '../components/Screen';
 import { supabase } from '../lib/supabase';
 
 export default function Index() {
@@ -50,14 +51,14 @@ export default function Index() {
 
   if (checking) {
     return (
-      <View className="flex-1 bg-bg items-center justify-center">
+      <Screen className="items-center justify-center">
         <ActivityIndicator color="#7E8F86" />
-      </View>
+      </Screen>
     );
   }
 
   return (
-    <View className="flex-1 bg-bg px-6 justify-center">
+    <Screen className="px-6 justify-center">
       <Text className="font-heading text-title-lg text-ink mb-2">anoko monitor</Text>
       <Text className="font-body text-body text-ink-soft mb-12">モニター管理アプリ</Text>
 
@@ -69,6 +70,6 @@ export default function Index() {
         variant="secondary"
         onPress={() => router.push('/admin-login')}
       />
-    </View>
+    </Screen>
   );
 }
