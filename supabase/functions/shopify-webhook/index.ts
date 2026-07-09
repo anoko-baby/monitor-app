@@ -29,7 +29,8 @@ Deno.serve(async (req: Request) => {
     return new Response('method not allowed', { status: 405 });
   }
 
-  const webhookSecret = Deno.env.get('SHOPIFY_WEBHOOK_SECRET');
+  // WebhookのHMAC検証にはアプリのクライアントシークレット(SHOPIFY_API_SECRET)を使う。
+  const webhookSecret = Deno.env.get('SHOPIFY_API_SECRET');
   if (!webhookSecret) {
     return new Response('webhook secret not configured', { status: 500 });
   }

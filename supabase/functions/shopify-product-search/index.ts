@@ -1,6 +1,6 @@
 // 商品検索(GraphQL)。案件登録時の商品検索に使う(仕様書 v1.8 3.2)。
 // 検索結果のキャッシュ(products/variantsへの保存)は、実際に案件へ選択された時点でM5側が行う。
-const SHOPIFY_API_VERSION = '2025-10';
+import { getShopifyAccessToken, SHOPIFY_API_VERSION } from '../_shared/shopify.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,14 +26,14 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const storeDomain = Deno.env.get('SHOPIFY_STORE_DOMAIN');
-  const accessToken = Deno.env.get('SHOPIFY_ACCESS_TOKEN');
-  if (!storeDomain || !accessToken) {
-    return new Response(JSON.stringify({ error: 'Shopify secrets are not configured' }), {
+  const tokenResult = await getShopifyAccessToken();
+  if ('error' in tokenResult) {
+    return new Response(JSON.stringify({ error: tokenResult.error }), {
       status: 500,
       headers: corsHeaders,
     });
   }
+  const { token: accessToken, storeDomain } = tokenResult;
 
   const gqlQuery = `
     query SearchProducts($query: String!) {
