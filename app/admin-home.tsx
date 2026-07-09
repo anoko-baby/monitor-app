@@ -5,7 +5,7 @@ import { AppButton } from '../components/AppButton';
 import { Screen } from '../components/Screen';
 import { supabase } from '../lib/supabase';
 
-// 案件一覧・全提出一覧はM5/M7で作る。M2時点では招待発行への入口のみのスタブ。
+// 案件一覧・全提出一覧はM5/M7で作る。M3時点ではモニター管理への入口のみのスタブ。
 export default function AdminHome() {
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -16,8 +16,15 @@ export default function AdminHome() {
     <Screen className="px-6 pt-6">
       <Text className="font-heading text-title-lg text-ink mb-8">ホーム</Text>
 
+      <View className="mb-3">
+        <AppButton label="モニター一覧" onPress={() => router.push('/admin-monitor-list')} />
+      </View>
       <View className="mb-4">
-        <AppButton label="モニターを招待する" onPress={() => router.push('/admin-invite-issue')} />
+        <AppButton
+          label="モニターを招待する"
+          variant="secondary"
+          onPress={() => router.push('/admin-invite-issue')}
+        />
       </View>
 
       <Pressable onPress={handleSignOut} className="items-center">

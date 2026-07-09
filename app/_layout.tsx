@@ -36,6 +36,9 @@ export default function RootLayout() {
         <Stack.Screen name="welcome" options={{ headerShown: false }} />
         <Stack.Screen name="admin-home" options={{ headerShown: false }} />
         <Stack.Screen name="admin-invite-issue" options={{ title: 'モニターを招待する' }} />
+        <Stack.Screen name="admin-monitor-list" options={{ title: 'モニター一覧' }} />
+        <Stack.Screen name="admin-monitor-detail" options={{ title: 'モニター詳細' }} />
+        <Stack.Screen name="monitor-profile" options={{ title: 'プロフィール' }} />
         <Stack.Screen name="dev-upload-test" options={{ title: 'Dropboxアップロード検証(開発用)' }} />
       </Stack>
     </SafeAreaProvider>
