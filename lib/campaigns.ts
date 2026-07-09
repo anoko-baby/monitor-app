@@ -4,6 +4,29 @@ export function formatCampaignNo(campaignNo: number): string {
   return `A-${String(campaignNo).padStart(4, '0')}`;
 }
 
+// パス使用不可文字(/ \ : * ? " < > |)を「-」に置換する(仕様書 v1.8 6.1)。
+// supabase/functions/dropbox-create-campaign-folders/index.ts と同じロジック(要同期)。
+export function sanitizeDropboxPathSegment(segment: string): string {
+  return segment.replace(/[/\\:*?"<>|]/g, '-').trim();
+}
+
+// 回次フォルダ名(例: 第2回_20260910)。dropbox-create-campaign-foldersが作成時に使った命名と
+// 同じロジックで、アップロード時にクライアント側からも同じフォルダ名を再現するために使う。
+export function formatCycleFolderName(cycleNo: number, mediaDueDate: string): string {
+  return sanitizeDropboxPathSegment(`第${cycleNo}回_${mediaDueDate.replaceAll('-', '')}`);
+}
+
+// 提出ファイル名(例: 02_001_IMG_1234.jpg)(仕様書 v1.8 6.1)。
+export function formatSubmissionFileName(
+  cycleNo: number,
+  sequenceNo: number,
+  originalFilename: string
+): string {
+  const cyclePart = String(cycleNo).padStart(2, '0');
+  const seqPart = String(sequenceNo).padStart(3, '0');
+  return `${cyclePart}_${seqPart}_${sanitizeDropboxPathSegment(originalFilename)}`;
+}
+
 export function suggestCampaignTitle(productLabel: string, monitorName: string): string {
   return `${productLabel} モニター(${monitorName}様)`;
 }

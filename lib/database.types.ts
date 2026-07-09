@@ -544,6 +544,97 @@ export type Database = {
         }
         Relationships: []
       }
+      submission_files: {
+        Row: {
+          created_at: string
+          dropbox_path: string
+          dropbox_shared_url: string | null
+          duration_sec: number | null
+          file_size: number | null
+          id: string
+          is_starred: boolean
+          kind: Database["public"]["Enums"]["submission_file_kind"]
+          original_filename: string | null
+          submission_id: string
+          thumbnail_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dropbox_path: string
+          dropbox_shared_url?: string | null
+          duration_sec?: number | null
+          file_size?: number | null
+          id?: string
+          is_starred?: boolean
+          kind: Database["public"]["Enums"]["submission_file_kind"]
+          original_filename?: string | null
+          submission_id: string
+          thumbnail_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dropbox_path?: string
+          dropbox_shared_url?: string | null
+          duration_sec?: number | null
+          file_size?: number | null
+          id?: string
+          is_starred?: boolean
+          kind?: Database["public"]["Enums"]["submission_file_kind"]
+          original_filename?: string | null
+          submission_id?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submission_files_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      submissions: {
+        Row: {
+          created_at: string
+          form_data: Json
+          id: string
+          sns_urls: Json
+          task_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          form_data?: Json
+          id?: string
+          sns_urls?: Json
+          task_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          form_data?: Json
+          id?: string
+          sns_urls?: Json
+          task_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submissions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: true
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           created_at: string
@@ -682,6 +773,10 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["profile_role"]
       }
+      mark_campaign_delivered: {
+        Args: { p_campaign_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       campaign_recurrence_type: "once" | "monthly"
@@ -692,6 +787,7 @@ export type Database = {
       form_field_input_type: "date" | "number" | "select" | "text"
       profile_role: "admin" | "staff" | "monitor"
       profile_status: "invited" | "active" | "inactive"
+      submission_file_kind: "photo" | "video"
       task_status:
         | "pending"
         | "submitted"
@@ -837,6 +933,7 @@ export const Constants = {
       form_field_input_type: ["date", "number", "select", "text"],
       profile_role: ["admin", "staff", "monitor"],
       profile_status: ["invited", "active", "inactive"],
+      submission_file_kind: ["photo", "video"],
       task_status: [
         "pending",
         "submitted",

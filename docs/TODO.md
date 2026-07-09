@@ -133,7 +133,7 @@ Dropboxのリフレッシュトークンと同じ考え方)。
 
 ---
 
-## M6. データ提出+Dropboxアップロード本実装、SNS投稿記録
+## M6. データ提出+Dropboxアップロード本実装、SNS投稿記録 ✅完了(2026-07-10)
 
 - モニター側: ホーム(案件一覧+期限バッジ)、案件詳細(到着確認ボタン)、データ提出フォーム(M1のアップロードロジックを統合、EXIF GPS除去、サムネイル生成、動的フォーム項目、ドラフト保存、Wi-Fiのみアップロード設定)、SNS投稿記録フォーム、提出履歴
 
@@ -141,6 +141,17 @@ Dropboxのリフレッシュトークンと同じ考え方)。
 - 実機でモニターが回次を選び、複数の写真+動画を提出できる
 - Dropboxに正しいパスでファイルが格納され、サムネイルが生成され、GPS情報が除去されていることを確認できる
 - 期限内は提出後も追加編集ができ、SNS投稿記録も提出できる
+
+**実装メモ**
+- DBは`submissions`/`submission_files`を新設。モニターは自分の案件のタスクのみ`submitted`に更新可能、`submissions`/`submission_files`はINSERT/SELECT(`submissions`はUPDATEも)可能というRLSを追加。到着確認は`campaigns`がモニターSELECT専用のRLS方針を崩さないよう、`mark_campaign_delivered`という専用RPC(SECURITY DEFINER)を新設して対応した
+- GPS除去は当初`piexifjs`(JPEG専用)を想定していたが、調査の結果`@xoi/gps-metadata-remover`がJPEG/PNG/TIFF/MOV/MP4すべてをバイト単位(再エンコードなし)で処理できることが判明したため、こちらに一本化(`piexifjs`は削除)。read/writeアダプタは`expo-file-system`の新API(`File.open()`→`FileHandle`)で実装
+- HEIC写真はExpo Go運用を維持するため、選択時に`expo-image-manipulator`でJPEGへ変換(無劣化設定)してからGPS除去する方針をAzusaさんと確認して採用(HEICのまま無劣化除去する手段はExpo Go上に存在しないため)
+- サムネイルはSupabase Storageの`thumbnails`バケット(非公開)に保存。子どもの写真を扱うため、所有モニター本人とstaff/adminのみ読める構成にした。表示側は`getThumbnailSignedUrl`で都度署名付きURLを取得する
+- 「案件全体で1回」のSNSタスクの置き場と同様、ファイルの回次フォルダ名はM5の`dropbox-create-campaign-folders`と同じロジックを`lib/campaigns.ts`側にも実装して再現している(将来の期限編集機能を入れる際は両者を同期させる必要がある)
+- Wi-Fi限定アップロードは`expo-network`の`addNetworkStateListener`でアプリを開いている間のみ自動再開する方式(Phase1が明示的にバックグラウンド実行を対象外としているため、これに合わせた)
+- アップロード上限(写真30枚/50MB、動画5本/2GB)は`app_settings`テーブルがまだ無いため定数として実装。テーブル本体はM8で導入する
+- welcome.tsxを本実装のmonitor-home.tsxに差し替え、index.tsx/consent.tsxの遷移先も更新した
+- 実装中の動作確認で、案件詳細画面(campaign-detail.tsx)が案件データ取得に失敗した際にエラー表示されずスピナーのまま止まる不具合を発見・修正した
 
 ---
 

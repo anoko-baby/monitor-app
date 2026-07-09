@@ -40,7 +40,7 @@ export default function Index() {
       } else if (!profile.tos_agreed_at) {
         router.replace('/consent');
       } else {
-        router.replace('/welcome');
+        router.replace('/monitor-home');
       }
     })();
 

@@ -42,7 +42,7 @@ export default function Consent() {
     }
 
     setSubmitting(false);
-    router.replace('/welcome');
+    router.replace('/monitor-home');
   }
 
   return (

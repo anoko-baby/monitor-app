@@ -33,7 +33,11 @@ export default function RootLayout() {
         <Stack.Screen name="invite-code" options={{ title: '招待コード入力' }} />
         <Stack.Screen name="register" options={{ title: 'メール登録' }} />
         <Stack.Screen name="consent" options={{ title: '利用同意', headerBackVisible: false }} />
-        <Stack.Screen name="welcome" options={{ headerShown: false }} />
+        <Stack.Screen name="monitor-home" options={{ headerShown: false }} />
+        <Stack.Screen name="campaign-detail" options={{ title: '案件詳細' }} />
+        <Stack.Screen name="submission-form" options={{ title: '提出する' }} />
+        <Stack.Screen name="sns-submission-form" options={{ title: 'SNS投稿記録' }} />
+        <Stack.Screen name="submission-history" options={{ title: '提出履歴' }} />
         <Stack.Screen name="admin-home" options={{ headerShown: false }} />
         <Stack.Screen name="admin-invite-issue" options={{ title: 'モニターを招待する' }} />
         <Stack.Screen name="admin-monitor-list" options={{ title: 'モニター一覧' }} />
