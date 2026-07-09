@@ -109,7 +109,7 @@ Dropboxのリフレッシュトークンと同じ考え方)。
 
 ---
 
-## M5. 案件管理
+## M5. 案件管理 ✅完了(2026-07-10)
 
 - DBスキーマ: `campaigns` / `campaign_variants` / `form_fields`(シード) / `campaign_form_fields` / `cycles` / `tasks` + 生成ロジック
 - 案件作成・編集画面(Shopify商品検索 or 手動入力、Shopify注文取込、繰り返し期限生成、SNS設定、フォーム項目選択、撮影ガイドライン)
@@ -121,6 +121,15 @@ Dropboxのリフレッシュトークンと同じ考え方)。
 - 実機で管理者が注文取込を使って繰り返し案件(例: 全6回)を登録 → 6個の回次・タスクが自動生成され一覧に表示される
 - Dropboxに規定のフォルダ構造が実際に作成されている
 - クーポン注文タブから「案件化する」を押すと、案件作成画面にモニター・商品・案件名が自動入力される
+
+**実装メモ**
+- DBは`form_fields`(シード6件)/`campaigns`/`campaign_variants`/`campaign_form_fields`/`cycles`/`tasks`を新設。`coupon_orders.campaign_id`にM4で保留していたFKも追加
+- 回次・タスク生成ロジック(月末丸め込み含む)は`lib/campaigns.ts`にクライアント側の純粋関数として実装。DB書き込みはservice roleを使わず、staff/admin権限のRLSの下でクライアントから直接行う方針にした(M2/M3までの方針を踏襲)
+- Dropboxフォルダ作成のみ`dropbox-create-campaign-folders` Edge Functionを新設(呼び出し元のJWTをそのまま転送し、service roleは使わない)。あわせて`dropbox-token`のトークン取得処理を`_shared/dropbox.ts`に共通化
+- `shopify-order-lookup`を拡張し、商品/バリアントIDの返却と、注文の顧客IDから`profiles.shopify_customer_id`が一致するモニターの自動検索を追加
+- 「案件全体で1回」のSNSタスクは、案件全体で回次と独立した置き場が仕様書のDB設計に無いため、第1回のタスクとして生成する運用にした
+- 案件編集画面は基本情報(案件名・撮影ガイドライン・リマインド・社内メモ)の編集+回次/タスクの閲覧のみに絞り、複製・一括延長・途中中止・個別回次の期限編集(3.3.4)は次のマイルストーン以降に持ち越し。案件ステータスの自動遷移(4.2: 全タスクapproved→completed)もM7(検収)実装時にあわせて追加する
+- 実機確認で「モニター検索・商品検索でうまく選べない」不具合が発生。原因はScrollView内でキーボード表示中に候補やボタンをタップすると1回目のタップが握りつぶされるReact Nativeの既定動作(`keyboardShouldPersistTaps`未設定)。`keyboardShouldPersistTaps="handled"`を追加して解消し、あわせて検索結果0件時のメッセージ表示・選択済みSKUのチェックマーク表示など選択状態の視認性も改善した
 
 ---
 

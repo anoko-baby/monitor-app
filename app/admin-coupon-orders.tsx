@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
@@ -10,6 +11,8 @@ type CouponOrder = {
   coupon_code: string;
   customer_name: string | null;
   monitor_id: string | null;
+  monitor_name: string | null;
+  line_items: unknown;
   status: 'pending' | 'converted' | 'skipped';
 };
 
@@ -28,9 +31,21 @@ export default function AdminCouponOrders() {
     setLoading(true);
     const { data } = await supabase
       .from('coupon_orders')
-      .select('id, order_no, ordered_at, coupon_code, customer_name, monitor_id, status')
+      .select('id, order_no, ordered_at, coupon_code, customer_name, monitor_id, line_items, status, monitor:profiles(name)')
       .order('ordered_at', { ascending: false });
-    setOrders(data ?? []);
+    setOrders(
+      (data ?? []).map((o: any) => ({
+        id: o.id,
+        order_no: o.order_no,
+        ordered_at: o.ordered_at,
+        coupon_code: o.coupon_code,
+        customer_name: o.customer_name,
+        monitor_id: o.monitor_id,
+        monitor_name: o.monitor?.name ?? null,
+        line_items: o.line_items,
+        status: o.status,
+      }))
+    );
     setLoading(false);
   }
 
@@ -41,6 +56,20 @@ export default function AdminCouponOrders() {
   async function markSkipped(id: string) {
     await supabase.from('coupon_orders').update({ status: 'skipped' }).eq('id', id);
     loadOrders();
+  }
+
+  function handleConvert(order: CouponOrder) {
+    router.push({
+      pathname: '/admin-campaign-form',
+      params: {
+        sourceOrderId: order.id,
+        monitorId: order.monitor_id ?? undefined,
+        monitorName: order.monitor_name ?? undefined,
+        shipmentOrderNo: order.order_no,
+        shippedAt: order.ordered_at.slice(0, 10),
+        lineItems: JSON.stringify(order.line_items ?? []),
+      },
+    });
   }
 
   return (
@@ -70,9 +99,14 @@ export default function AdminCouponOrders() {
               {item.monitor_id ? ' ・ 紐付け済み' : ' ・ 未紐付け'}
             </Text>
             {item.status === 'pending' && (
-              <Pressable onPress={() => markSkipped(item.id)}>
-                <Text className="font-body text-caption text-status-overdue">対象外にする</Text>
-              </Pressable>
+              <View className="flex-row items-center mt-1" style={{ gap: 16 }}>
+                <Pressable onPress={() => handleConvert(item)}>
+                  <Text className="font-body-medium text-caption text-accent-ink">案件化する</Text>
+                </Pressable>
+                <Pressable onPress={() => markSkipped(item.id)}>
+                  <Text className="font-body text-caption text-status-overdue">対象外にする</Text>
+                </Pressable>
+              </View>
             )}
           </View>
         )}

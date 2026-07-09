@@ -12,7 +12,7 @@ const LINKS: { label: string; href: '/admin-invite-issue' | '/admin-product-sear
   { label: 'クーポン注文', href: '/admin-coupon-orders' },
 ];
 
-// 案件一覧・全提出一覧はM5/M7で作る。M4時点ではモニター管理・Shopify連携への入口のみのスタブ。
+// 全提出一覧はM7で作る。
 export default function AdminHome() {
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -24,7 +24,11 @@ export default function AdminHome() {
       <Text className="font-heading text-title-lg text-ink mb-8">ホーム</Text>
 
       <View className="mb-6">
-        <AppButton label="モニター一覧" onPress={() => router.push('/admin-monitor-list')} />
+        <AppButton label="案件一覧" onPress={() => router.push('/admin-campaign-list')} />
+      </View>
+
+      <View className="mb-6">
+        <AppButton label="モニター一覧" onPress={() => router.push('/admin-monitor-list')} variant="secondary" />
       </View>
 
       {LINKS.map((link) => (

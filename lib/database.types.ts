@@ -39,6 +39,199 @@ export type Database = {
   }
   public: {
     Tables: {
+      campaign_form_fields: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          form_field_key: string
+          id: string
+          is_required: boolean
+          updated_at: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          form_field_key: string
+          id?: string
+          is_required?: boolean
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          form_field_key?: string
+          id?: string
+          is_required?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_form_fields_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_form_fields_form_field_key_fkey"
+            columns: ["form_field_key"]
+            isOneToOne: false
+            referencedRelation: "form_fields"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      campaign_variants: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          id: string
+          updated_at: string
+          variant_id: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          variant_id: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_variants_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_variants_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          campaign_no: number
+          child_id: string | null
+          created_at: string
+          cycles_count: number
+          deleted_at: string | null
+          delivered_at: string | null
+          dropbox_base_path: string | null
+          id: string
+          internal_memo: string | null
+          media_deadline_day: number | null
+          monitor_id: string
+          recurrence_type: Database["public"]["Enums"]["campaign_recurrence_type"]
+          reminder_enabled: boolean
+          shipment_order_no: string | null
+          shipped_at: string | null
+          shooting_guideline: string | null
+          sns_deadline_day: number | null
+          sns_frequency:
+            | Database["public"]["Enums"]["campaign_sns_frequency"]
+            | null
+          sns_once_due_date: string | null
+          sns_required: boolean
+          source_order_id: string | null
+          start_month: string | null
+          status: Database["public"]["Enums"]["campaign_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          campaign_no?: never
+          child_id?: string | null
+          created_at?: string
+          cycles_count?: number
+          deleted_at?: string | null
+          delivered_at?: string | null
+          dropbox_base_path?: string | null
+          id?: string
+          internal_memo?: string | null
+          media_deadline_day?: number | null
+          monitor_id: string
+          recurrence_type: Database["public"]["Enums"]["campaign_recurrence_type"]
+          reminder_enabled?: boolean
+          shipment_order_no?: string | null
+          shipped_at?: string | null
+          shooting_guideline?: string | null
+          sns_deadline_day?: number | null
+          sns_frequency?:
+            | Database["public"]["Enums"]["campaign_sns_frequency"]
+            | null
+          sns_once_due_date?: string | null
+          sns_required?: boolean
+          source_order_id?: string | null
+          start_month?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          campaign_no?: never
+          child_id?: string | null
+          created_at?: string
+          cycles_count?: number
+          deleted_at?: string | null
+          delivered_at?: string | null
+          dropbox_base_path?: string | null
+          id?: string
+          internal_memo?: string | null
+          media_deadline_day?: number | null
+          monitor_id?: string
+          recurrence_type?: Database["public"]["Enums"]["campaign_recurrence_type"]
+          reminder_enabled?: boolean
+          shipment_order_no?: string | null
+          shipped_at?: string | null
+          shooting_guideline?: string | null
+          sns_deadline_day?: number | null
+          sns_frequency?:
+            | Database["public"]["Enums"]["campaign_sns_frequency"]
+            | null
+          sns_once_due_date?: string | null
+          sns_required?: boolean
+          source_order_id?: string | null
+          start_month?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: false
+            referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_monitor_id_fkey"
+            columns: ["monitor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_source_order_id_fkey"
+            columns: ["source_order_id"]
+            isOneToOne: false
+            referencedRelation: "coupon_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       children: {
         Row: {
           birth_month: string | null
@@ -128,6 +321,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "coupon_orders_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "coupon_orders_monitor_id_fkey"
             columns: ["monitor_id"]
             isOneToOne: false
@@ -135,6 +335,80 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cycles: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          cycle_no: number
+          id: string
+          label: string
+          updated_at: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          cycle_no: number
+          id?: string
+          label: string
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          cycle_no?: number
+          id?: string
+          label?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cycles_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_fields: {
+        Row: {
+          created_at: string
+          id: string
+          input_type: Database["public"]["Enums"]["form_field_input_type"]
+          is_system: boolean
+          key: string
+          label: string
+          options: Json | null
+          sort_order: number
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          input_type: Database["public"]["Enums"]["form_field_input_type"]
+          is_system?: boolean
+          key: string
+          label: string
+          options?: Json | null
+          sort_order?: number
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          input_type?: Database["public"]["Enums"]["form_field_input_type"]
+          is_system?: boolean
+          key?: string
+          label?: string
+          options?: Json | null
+          sort_order?: number
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       invite_codes: {
         Row: {
@@ -270,6 +544,63 @@ export type Database = {
         }
         Relationships: []
       }
+      tasks: {
+        Row: {
+          created_at: string
+          cycle_id: string
+          due_date: string
+          first_submitted_at: string | null
+          id: string
+          reviewed_at: string | null
+          reviewer_id: string | null
+          status: Database["public"]["Enums"]["task_status"]
+          submitted_at: string | null
+          type: Database["public"]["Enums"]["task_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cycle_id: string
+          due_date: string
+          first_submitted_at?: string | null
+          id?: string
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          status?: Database["public"]["Enums"]["task_status"]
+          submitted_at?: string | null
+          type: Database["public"]["Enums"]["task_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cycle_id?: string
+          due_date?: string
+          first_submitted_at?: string | null
+          id?: string
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          status?: Database["public"]["Enums"]["task_status"]
+          submitted_at?: string | null
+          type?: Database["public"]["Enums"]["task_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       variants: {
         Row: {
           color: string | null
@@ -353,10 +684,21 @@ export type Database = {
       }
     }
     Enums: {
+      campaign_recurrence_type: "once" | "monthly"
+      campaign_sns_frequency: "every_cycle" | "once"
+      campaign_status: "active" | "completed" | "cancelled"
       child_sex: "male" | "female"
       coupon_order_status: "pending" | "converted" | "skipped"
+      form_field_input_type: "date" | "number" | "select" | "text"
       profile_role: "admin" | "staff" | "monitor"
       profile_status: "invited" | "active" | "inactive"
+      task_status:
+        | "pending"
+        | "submitted"
+        | "approved"
+        | "rejected"
+        | "cancelled"
+      task_type: "media" | "sns"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -487,10 +829,22 @@ export const Constants = {
   },
   public: {
     Enums: {
+      campaign_recurrence_type: ["once", "monthly"],
+      campaign_sns_frequency: ["every_cycle", "once"],
+      campaign_status: ["active", "completed", "cancelled"],
       child_sex: ["male", "female"],
       coupon_order_status: ["pending", "converted", "skipped"],
+      form_field_input_type: ["date", "number", "select", "text"],
       profile_role: ["admin", "staff", "monitor"],
       profile_status: ["invited", "active", "inactive"],
+      task_status: [
+        "pending",
+        "submitted",
+        "approved",
+        "rejected",
+        "cancelled",
+      ],
+      task_type: ["media", "sns"],
     },
   },
 } as const
