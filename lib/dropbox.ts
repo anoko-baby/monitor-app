@@ -1,11 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { File } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import { supabase } from './supabase';
 
 // Dropbox upload_session はこの単位でチャンク分割する(仕様書 v1.8 6.2)
 const CHUNK_SIZE = 8 * 1024 * 1024;
 const SESSION_STORE_PREFIX = 'dropbox_upload_session:';
+const TEMP_CHUNK_FILENAME = 'dropbox_upload_chunk.tmp';
 
 type UploadSessionState = {
   sessionId: string;
@@ -55,27 +56,49 @@ export function clearUploadSession(resumeKey: string): Promise<void> {
   return clearSessionInternal(resumeKey);
 }
 
-async function callDropboxContent(
+// React NativeのfetchはBlob/ArrayBufferボディに対応していないため、
+// チャンクを一度ローカルの一時ファイルに書き出し、FileSystem.uploadAsync(ネイティブ実装)で送信する。
+async function writeChunkToTempFile(
+  fileUri: string,
+  position: number,
+  length: number
+): Promise<string> {
+  const base64Chunk = await FileSystem.readAsStringAsync(fileUri, {
+    encoding: FileSystem.EncodingType.Base64,
+    position,
+    length,
+  });
+  const tempUri = `${FileSystem.cacheDirectory}${TEMP_CHUNK_FILENAME}`;
+  await FileSystem.writeAsStringAsync(tempUri, base64Chunk, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  return tempUri;
+}
+
+async function callDropboxContentFromFile(
   endpoint: 'upload_session/start' | 'upload_session/append_v2' | 'upload_session/finish',
   accessToken: string,
   apiArg: unknown,
-  body: Blob
+  chunkFileUri: string
 ): Promise<any> {
-  const response = await fetch(`https://content.dropboxapi.com/2/files/${endpoint}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/octet-stream',
-      'Dropbox-API-Arg': JSON.stringify(apiArg),
-    },
-    body,
-  });
+  const result = await FileSystem.uploadAsync(
+    `https://content.dropboxapi.com/2/files/${endpoint}`,
+    chunkFileUri,
+    {
+      httpMethod: 'POST',
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/octet-stream',
+        'Dropbox-API-Arg': JSON.stringify(apiArg),
+      },
+    }
+  );
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new DropboxApiError(`Dropbox API error (${endpoint}): ${response.status}`, errorBody);
+  if (result.status < 200 || result.status >= 300) {
+    throw new DropboxApiError(`Dropbox API error (${endpoint}): ${result.status}`, result.body);
   }
-  return response.json();
+  return JSON.parse(result.body);
 }
 
 // append_v2/finish で offset がずれていた場合、Dropboxはエラー本文に正しいoffsetを返す。
@@ -102,8 +125,11 @@ export async function uploadFileToDropboxChunked({
   resumeKey: string;
   onProgress?: (progress: UploadProgress) => void;
 }): Promise<{ path: string }> {
-  const file = new File(fileUri);
-  const totalSize = file.size ?? 0;
+  const info = await FileSystem.getInfoAsync(fileUri);
+  if (!info.exists) {
+    throw new Error('ファイルが見つかりませんでした');
+  }
+  const totalSize = info.size ?? 0;
   if (totalSize <= 0) {
     throw new Error('ファイルサイズを取得できませんでした');
   }
@@ -113,50 +139,54 @@ export async function uploadFileToDropboxChunked({
   let session: UploadSessionState | null = await loadSession(resumeKey);
 
   if (!session) {
-    const firstChunkEnd = Math.min(CHUNK_SIZE, totalSize);
-    const firstChunk = file.slice(0, firstChunkEnd);
-    const startResult = await callDropboxContent(
-      'upload_session/start',
-      accessToken,
-      { close: false },
-      firstChunk
-    );
-    session = {
-      sessionId: startResult.session_id,
-      offset: firstChunkEnd,
-      totalSize,
-      destPath,
-    };
-    await saveSession(resumeKey, session);
-    onProgress?.({ bytesUploaded: session.offset, totalBytes: totalSize });
+    const firstLength = Math.min(CHUNK_SIZE, totalSize);
+    const chunkUri = await writeChunkToTempFile(fileUri, 0, firstLength);
+    try {
+      const startResult = await callDropboxContentFromFile(
+        'upload_session/start',
+        accessToken,
+        { close: false },
+        chunkUri
+      );
+      session = {
+        sessionId: startResult.session_id,
+        offset: firstLength,
+        totalSize,
+        destPath,
+      };
+      await saveSession(resumeKey, session);
+      onProgress?.({ bytesUploaded: session.offset, totalBytes: totalSize });
+    } finally {
+      await FileSystem.deleteAsync(chunkUri, { idempotent: true });
+    }
   }
 
   while (session.offset < session.totalSize) {
     const remaining: number = session.totalSize - session.offset;
     const isLast: boolean = remaining <= CHUNK_SIZE;
-    const chunkEnd: number = session.offset + Math.min(CHUNK_SIZE, remaining);
-    const chunk = file.slice(session.offset, chunkEnd);
+    const length: number = Math.min(CHUNK_SIZE, remaining);
+    const chunkUri = await writeChunkToTempFile(fileUri, session.offset, length);
 
     try {
       if (!isLast) {
-        await callDropboxContent(
+        await callDropboxContentFromFile(
           'upload_session/append_v2',
           accessToken,
           { cursor: { session_id: session.sessionId, offset: session.offset }, close: false },
-          chunk
+          chunkUri
         );
-        session = { ...session, offset: chunkEnd };
+        session = { ...session, offset: session.offset + length };
         await saveSession(resumeKey, session);
         onProgress?.({ bytesUploaded: session.offset, totalBytes: session.totalSize });
       } else {
-        const finishResult = await callDropboxContent(
+        const finishResult = await callDropboxContentFromFile(
           'upload_session/finish',
           accessToken,
           {
             cursor: { session_id: session.sessionId, offset: session.offset },
             commit: { path: session.destPath, mode: 'add', autorename: true },
           },
-          chunk
+          chunkUri
         );
         await clearSessionInternal(resumeKey);
         onProgress?.({ bytesUploaded: session.totalSize, totalBytes: session.totalSize });
@@ -172,6 +202,8 @@ export async function uploadFileToDropboxChunked({
         }
       }
       throw err;
+    } finally {
+      await FileSystem.deleteAsync(chunkUri, { idempotent: true });
     }
   }
 
