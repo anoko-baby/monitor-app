@@ -1,0 +1,27 @@
+# Node / Expo
+node_modules/
+.expo/
+.expo-shared/
+dist/
+web-build/
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Env / secrets (never commit real secrets)
+.env
+.env.*
+!.env.example
+
+# Supabase
+supabase/.branches
+supabase/.temp
+
+# EAS
+.eas/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
