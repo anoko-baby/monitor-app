@@ -3,7 +3,17 @@ import { Pressable, Text, View } from 'react-native';
 
 import { supabase } from '../lib/supabase';
 import { AppButton } from './AppButton';
+import { ErrorBanner } from './ErrorBanner';
 import { TextField } from './TextField';
+
+// birth_month はDB上は date 型(年月日)。"YYYY-MM" 入力を月初日に正規化して保存する。
+function normalizeBirthMonth(input: string): { value: string | null; error: string | null } {
+  const trimmed = input.trim();
+  if (!trimmed) return { value: null, error: null };
+  if (/^\d{4}-\d{2}$/.test(trimmed)) return { value: `${trimmed}-01`, error: null };
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return { value: trimmed, error: null };
+  return { value: null, error: '生年月は YYYY-MM の形式で入力してください(例: 2024-05)' };
+}
 
 type Child = {
   id: string;
@@ -19,6 +29,8 @@ export function ChildrenManager({ monitorId }: { monitorId: string }) {
   const [newName, setNewName] = useState('');
   const [newBirthMonth, setNewBirthMonth] = useState('');
   const [newSex, setNewSex] = useState<'male' | 'female' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   async function loadChildren() {
     setLoading(true);
@@ -38,12 +50,30 @@ export function ChildrenManager({ monitorId }: { monitorId: string }) {
 
   async function handleAdd() {
     if (!newName) return;
-    await supabase.from('children').insert({
+
+    const { value: birthMonth, error: formatError } = normalizeBirthMonth(newBirthMonth);
+    if (formatError) {
+      setError(formatError);
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
+    const { error: insertError } = await supabase.from('children').insert({
       monitor_id: monitorId,
       call_name: newName,
-      birth_month: newBirthMonth || null,
+      birth_month: birthMonth,
       sex: newSex,
     });
+
+    setSaving(false);
+
+    if (insertError) {
+      setError('登録に失敗しました。もう一度お試しください。');
+      return;
+    }
+
     setNewName('');
     setNewBirthMonth('');
     setNewSex(null);
@@ -52,7 +82,11 @@ export function ChildrenManager({ monitorId }: { monitorId: string }) {
   }
 
   async function handleDelete(id: string) {
-    await supabase.from('children').delete().eq('id', id);
+    const { error: deleteError } = await supabase.from('children').delete().eq('id', id);
+    if (deleteError) {
+      setError('削除に失敗しました。もう一度お試しください。');
+      return;
+    }
     loadChildren();
   }
 
@@ -84,6 +118,8 @@ export function ChildrenManager({ monitorId }: { monitorId: string }) {
         </View>
       ))}
 
+      {error && <ErrorBanner message={error} />}
+
       {adding ? (
         <View className="bg-surface rounded-card border-hairline border-line p-4 mt-2">
           <TextField label="呼び名" value={newName} onChangeText={setNewName} />
@@ -113,7 +149,12 @@ export function ChildrenManager({ monitorId }: { monitorId: string }) {
             ))}
           </View>
 
-          <AppButton label="追加する" onPress={handleAdd} disabled={!newName} />
+          <AppButton
+            label={saving ? '追加中…' : '追加する'}
+            onPress={handleAdd}
+            disabled={!newName}
+            loading={saving}
+          />
         </View>
       ) : (
         <Pressable onPress={() => setAdding(true)} className="items-center mt-1">
