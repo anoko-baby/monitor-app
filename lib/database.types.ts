@@ -77,6 +77,65 @@ export type Database = {
           },
         ]
       }
+      coupon_orders: {
+        Row: {
+          campaign_id: string | null
+          coupon_code: string
+          created_at: string
+          customer_email: string | null
+          customer_name: string | null
+          id: string
+          line_items: Json
+          monitor_id: string | null
+          order_no: string
+          ordered_at: string
+          shopify_customer_id: string | null
+          shopify_order_id: string
+          status: Database["public"]["Enums"]["coupon_order_status"]
+          updated_at: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          coupon_code: string
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          id?: string
+          line_items?: Json
+          monitor_id?: string | null
+          order_no: string
+          ordered_at: string
+          shopify_customer_id?: string | null
+          shopify_order_id: string
+          status?: Database["public"]["Enums"]["coupon_order_status"]
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string | null
+          coupon_code?: string
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          id?: string
+          line_items?: Json
+          monitor_id?: string | null
+          order_no?: string
+          ordered_at?: string
+          shopify_customer_id?: string | null
+          shopify_order_id?: string
+          status?: Database["public"]["Enums"]["coupon_order_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupon_orders_monitor_id_fkey"
+            columns: ["monitor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invite_codes: {
         Row: {
           code: string
@@ -114,6 +173,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      products: {
+        Row: {
+          brand: string | null
+          created_at: string
+          id: string
+          image_url: string | null
+          shopify_product_id: string | null
+          synced_at: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          brand?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          shopify_product_id?: string | null
+          synced_at?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          brand?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          shopify_product_id?: string | null
+          synced_at?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -178,6 +270,77 @@ export type Database = {
         }
         Relationships: []
       }
+      variants: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          image_url: string | null
+          product_id: string
+          shopify_variant_id: string | null
+          size: string | null
+          sku: string | null
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          product_id: string
+          shopify_variant_id?: string | null
+          size?: string | null
+          sku?: string | null
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          product_id?: string
+          shopify_variant_id?: string | null
+          size?: string | null
+          sku?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "variants_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      watched_coupons: {
+        Row: {
+          active: boolean
+          code: string
+          created_at: string
+          id: string
+          label: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -191,6 +354,7 @@ export type Database = {
     }
     Enums: {
       child_sex: "male" | "female"
+      coupon_order_status: "pending" | "converted" | "skipped"
       profile_role: "admin" | "staff" | "monitor"
       profile_status: "invited" | "active" | "inactive"
     }
@@ -324,6 +488,7 @@ export const Constants = {
   public: {
     Enums: {
       child_sex: ["male", "female"],
+      coupon_order_status: ["pending", "converted", "skipped"],
       profile_role: ["admin", "staff", "monitor"],
       profile_status: ["invited", "active", "inactive"],
     },
