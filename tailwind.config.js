@@ -38,6 +38,12 @@ module.exports = {
         caption: '13px',
         tiny: '11px',
       },
+      // 仕様書 v1.8 14.3: 見出し=Zen Maru Gothic(Medium) / 本文=Noto Sans JP
+      fontFamily: {
+        heading: ['ZenMaruGothic_500Medium'],
+        body: ['NotoSansJP_400Regular'],
+        'body-medium': ['NotoSansJP_500Medium'],
+      },
     },
   },
   plugins: [],
