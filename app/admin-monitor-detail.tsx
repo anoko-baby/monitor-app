@@ -107,7 +107,7 @@ export default function AdminMonitorDetail() {
         <ChildrenManager monitorId={profile.id} />
       </View>
 
-      <AchievementSection />
+      <AchievementSection monitorId={profile.id} />
     </ScrollView>
   );
 }

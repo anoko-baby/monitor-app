@@ -12,7 +12,6 @@ const LINKS: { label: string; href: '/admin-invite-issue' | '/admin-product-sear
   { label: 'クーポン注文', href: '/admin-coupon-orders' },
 ];
 
-// 全提出一覧はM7で作る。
 export default function AdminHome() {
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -25,6 +24,14 @@ export default function AdminHome() {
 
       <View className="mb-6">
         <AppButton label="案件一覧" onPress={() => router.push('/admin-campaign-list')} />
+      </View>
+
+      <View className="mb-6">
+        <AppButton
+          label="全提出一覧"
+          onPress={() => router.push('/admin-submission-list')}
+          variant="secondary"
+        />
       </View>
 
       <View className="mb-6">

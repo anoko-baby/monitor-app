@@ -23,6 +23,7 @@ export default function SnsSubmissionForm() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [taskStatus, setTaskStatus] = useState('pending');
   const [taskDueDate, setTaskDueDate] = useState('');
+  const [rejectComment, setRejectComment] = useState<string | null>(null);
   const [campaignTitle, setCampaignTitle] = useState('');
   const [cycleLabel, setCycleLabel] = useState('');
 
@@ -55,6 +56,18 @@ export default function SnsSubmissionForm() {
     }
     setTaskStatus(task.status);
     setTaskDueDate(task.due_date);
+
+    if (task.status === 'rejected') {
+      const { data: latestLog } = await supabase
+        .from('review_logs')
+        .select('comment')
+        .eq('task_id', taskId)
+        .eq('action', 'rejected')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setRejectComment(latestLog?.comment ?? null);
+    }
 
     const { data: cycle } = await supabase
       .from('cycles')
@@ -187,6 +200,13 @@ export default function SnsSubmissionForm() {
       <Text className="font-body text-caption text-ink-soft mb-4">
         {cycleLabel} ・ {formatDueDate(taskDueDate)}まで
       </Text>
+
+      {taskStatus === 'rejected' && rejectComment && (
+        <View className="bg-status-overdue/10 rounded-card p-4 mb-4">
+          <Text className="font-body-medium text-caption text-status-overdue mb-1">差し戻されました</Text>
+          <Text className="font-body text-caption text-status-overdue">{rejectComment}</Text>
+        </View>
+      )}
 
       {readOnly && (
         <Text className="font-body text-caption text-status-approved mb-4">

@@ -48,6 +48,8 @@ export default function RootLayout() {
         <Stack.Screen name="admin-coupon-orders" options={{ title: 'クーポン注文' }} />
         <Stack.Screen name="admin-campaign-list" options={{ title: '案件一覧' }} />
         <Stack.Screen name="admin-campaign-form" options={{ title: '案件作成・編集' }} />
+        <Stack.Screen name="admin-submission-list" options={{ title: '全提出一覧' }} />
+        <Stack.Screen name="admin-submission-detail" options={{ title: '提出詳細・検収' }} />
         <Stack.Screen name="dev-upload-test" options={{ title: 'Dropboxアップロード検証(開発用)' }} />
       </Stack>
     </SafeAreaProvider>

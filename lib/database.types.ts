@@ -73,6 +73,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "campaign_form_fields_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "submission_list_view"
+            referencedColumns: ["campaign_id"]
+          },
+          {
             foreignKeyName: "campaign_form_fields_form_field_key_fkey"
             columns: ["form_field_key"]
             isOneToOne: false
@@ -110,6 +117,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "campaigns"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_variants_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "submission_list_view"
+            referencedColumns: ["campaign_id"]
           },
           {
             foreignKeyName: "campaign_variants_variant_id_fkey"
@@ -328,6 +342,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "coupon_orders_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "submission_list_view"
+            referencedColumns: ["campaign_id"]
+          },
+          {
             foreignKeyName: "coupon_orders_monitor_id_fkey"
             columns: ["monitor_id"]
             isOneToOne: false
@@ -368,6 +389,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "campaigns"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cycles_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "submission_list_view"
+            referencedColumns: ["campaign_id"]
           },
         ]
       }
@@ -544,6 +572,68 @@ export type Database = {
         }
         Relationships: []
       }
+      review_logs: {
+        Row: {
+          action: Database["public"]["Enums"]["review_action"]
+          actor_id: string
+          comment: string | null
+          created_at: string
+          id: string
+          new_due_date: string | null
+          task_id: string
+          updated_at: string
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["review_action"]
+          actor_id: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          new_due_date?: string | null
+          task_id: string
+          updated_at?: string
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["review_action"]
+          actor_id?: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          new_due_date?: string | null
+          task_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_logs_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "submission_list_view"
+            referencedColumns: ["media_task_id"]
+          },
+          {
+            foreignKeyName: "review_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "submission_list_view"
+            referencedColumns: ["sns_task_id"]
+          },
+          {
+            foreignKeyName: "review_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       submission_files: {
         Row: {
           created_at: string
@@ -630,6 +720,20 @@ export type Database = {
             foreignKeyName: "submissions_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: true
+            referencedRelation: "submission_list_view"
+            referencedColumns: ["media_task_id"]
+          },
+          {
+            foreignKeyName: "submissions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: true
+            referencedRelation: "submission_list_view"
+            referencedColumns: ["sns_task_id"]
+          },
+          {
+            foreignKeyName: "submissions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: true
             referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
@@ -682,6 +786,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "cycles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "submission_list_view"
+            referencedColumns: ["cycle_id"]
           },
           {
             foreignKeyName: "tasks_reviewer_id_fkey"
@@ -765,7 +876,41 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      submission_list_view: {
+        Row: {
+          campaign_id: string | null
+          campaign_no: number | null
+          campaign_status: Database["public"]["Enums"]["campaign_status"] | null
+          campaign_title: string | null
+          cycle_id: string | null
+          cycle_no: number | null
+          cycles_count: number | null
+          has_starred: boolean | null
+          media_due_date: string | null
+          media_status: Database["public"]["Enums"]["task_status"] | null
+          media_submitted_at: string | null
+          media_task_id: string | null
+          monitor_id: string | null
+          monitor_name: string | null
+          product_brand: string | null
+          product_sku: string | null
+          product_title: string | null
+          sns_due_date: string | null
+          sns_status: Database["public"]["Enums"]["task_status"] | null
+          sns_submitted_at: string | null
+          sns_task_id: string | null
+          thumbnail_path: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_monitor_id_fkey"
+            columns: ["monitor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       current_profile_id: { Args: never; Returns: string }
@@ -787,6 +932,7 @@ export type Database = {
       form_field_input_type: "date" | "number" | "select" | "text"
       profile_role: "admin" | "staff" | "monitor"
       profile_status: "invited" | "active" | "inactive"
+      review_action: "approved" | "rejected"
       submission_file_kind: "photo" | "video"
       task_status:
         | "pending"
@@ -933,6 +1079,7 @@ export const Constants = {
       form_field_input_type: ["date", "number", "select", "text"],
       profile_role: ["admin", "staff", "monitor"],
       profile_status: ["invited", "active", "inactive"],
+      review_action: ["approved", "rejected"],
       submission_file_kind: ["photo", "video"],
       task_status: [
         "pending",

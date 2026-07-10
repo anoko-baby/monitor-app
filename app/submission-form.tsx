@@ -56,6 +56,7 @@ export default function SubmissionForm() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [taskStatus, setTaskStatus] = useState<string>('pending');
+  const [rejectComment, setRejectComment] = useState<string | null>(null);
   const [taskDueDate, setTaskDueDate] = useState('');
   const [campaignTitle, setCampaignTitle] = useState('');
   const [cycleLabel, setCycleLabel] = useState('');
@@ -120,6 +121,18 @@ export default function SubmissionForm() {
     setTaskStatus(task.status);
     setTaskDueDate(task.due_date);
     dueDateRef.current = task.due_date;
+
+    if (task.status === 'rejected') {
+      const { data: latestLog } = await supabase
+        .from('review_logs')
+        .select('comment')
+        .eq('task_id', taskId)
+        .eq('action', 'rejected')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setRejectComment(latestLog?.comment ?? null);
+    }
 
     const { data: cycle } = await supabase
       .from('cycles')
@@ -477,6 +490,13 @@ export default function SubmissionForm() {
         <Text className="font-body text-caption text-ink-soft mb-4">
           {skuInfo.map((s) => [s.sku, s.size, s.color].filter(Boolean).join(' / ')).join(' , ')}
         </Text>
+      )}
+
+      {taskStatus === 'rejected' && rejectComment && (
+        <View className="bg-status-overdue/10 rounded-card p-4 mb-4">
+          <Text className="font-body-medium text-caption text-status-overdue mb-1">差し戻されました</Text>
+          <Text className="font-body text-caption text-status-overdue">{rejectComment}</Text>
+        </View>
       )}
 
       {readOnly && (
