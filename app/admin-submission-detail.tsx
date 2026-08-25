@@ -5,7 +5,7 @@ import { ActivityIndicator, Image, Linking, Modal, Pressable, ScrollView, Text, 
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { TextField } from '../components/TextField';
-import { formatCampaignNo, formatCycleFolderName } from '../lib/campaigns';
+import { formatCampaignNo, formatCycleFolderName, monitorDisplayName } from '../lib/campaigns';
 import { createDropboxSharedLink } from '../lib/dropbox';
 import { getThumbnailSignedUrl } from '../lib/mediaPipeline';
 import { supabase } from '../lib/supabase';
@@ -139,10 +139,10 @@ export default function AdminSubmissionDetail() {
 
       const { data: monitor } = await supabase
         .from('profiles')
-        .select('name')
+        .select('name, instagram_handle')
         .eq('id', campaign.monitor_id)
         .maybeSingle();
-      setMonitorName(monitor?.name ?? '(モニター不明)');
+      setMonitorName(monitorDisplayName(monitor ? { name: monitor.name, instagramHandle: monitor.instagram_handle } : null));
     }
 
     const { data: variantLinks } = await supabase

@@ -4,8 +4,11 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
+import { BottomTabBar } from '../components/BottomTabBar';
+import { ErrorBanner } from '../components/ErrorBanner';
 import { Screen } from '../components/Screen';
 import { supabase } from '../lib/supabase';
+import { ADMIN_TAB_ITEMS } from '../lib/tabItems';
 
 type AnnouncementRow = {
   id: string;
@@ -18,13 +21,16 @@ type AnnouncementRow = {
 export default function AdminAnnouncementList() {
   const [rows, setRows] = useState<AnnouncementRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
-    const { data: announcements } = await supabase
+    setLoadError(null);
+    const { data: announcements, error } = await supabase
       .from('announcements')
       .select('id, title, sent_at')
       .order('created_at', { ascending: false });
+    if (error) setLoadError(`お知らせ一覧の取得に失敗しました: ${error.message}`);
 
     const ids = (announcements ?? []).map((a) => a.id);
     const { data: targets } = ids.length
@@ -52,15 +58,19 @@ export default function AdminAnnouncementList() {
   }, []);
 
   return (
-    <Screen className="px-6 pt-6">
+    <Screen>
+      <View className="flex-1 px-6 pt-6">
       <View className="mb-4">
         <AppButton label="お知らせを作成・配信する" onPress={() => router.push('/admin-announcement-form')} />
       </View>
+
+      {loadError && <ErrorBanner message={loadError} />}
 
       {loading ? (
         <ActivityIndicator color="#7E8F86" />
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={rows}
           keyExtractor={(item) => item.id}
           ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: '#E7E1D6' }} />}
@@ -82,6 +92,9 @@ export default function AdminAnnouncementList() {
           )}
         />
       )}
+      </View>
+
+      <BottomTabBar items={ADMIN_TAB_ITEMS} />
     </Screen>
   );
 }

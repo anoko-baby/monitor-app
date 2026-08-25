@@ -4,9 +4,11 @@ import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { BottomTabBar } from '../components/BottomTabBar';
 import { CycleDots } from '../components/CycleDots';
+import { ErrorBanner } from '../components/ErrorBanner';
 import { Screen } from '../components/Screen';
 import { CycleDotStatus, deriveCycleStatus } from '../lib/campaigns';
 import { supabase } from '../lib/supabase';
+import { monitorTabItems } from '../lib/tabItems';
 
 type CampaignRow = {
   id: string;
@@ -26,35 +28,49 @@ function formatDueDate(dateStr: string): string {
 export default function MonitorHome() {
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [unreadAnnouncements, setUnreadAnnouncements] = useState(0);
 
   async function load() {
     setLoading(true);
+    setLoadError(null);
 
     const {
       data: { session },
     } = await supabase.auth.getSession();
     if (!session) {
+      setLoadError('ログイン情報が確認できませんでした。もう一度ログインし直してください。');
       setLoading(false);
       return;
     }
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('id')
       .eq('auth_user_id', session.user.id)
       .maybeSingle();
+    if (profileError) {
+      setLoadError(`プロフィールの取得に失敗しました: ${profileError.message}`);
+      setLoading(false);
+      return;
+    }
     if (!profile) {
+      setLoadError('モニターのプロフィールが見つかりませんでした。管理者にご確認ください。');
       setLoading(false);
       return;
     }
 
-    const { data: campaignsData } = await supabase
+    const { data: campaignsData, error: campaignsError } = await supabase
       .from('campaigns')
       .select('id, title')
       .eq('monitor_id', profile.id)
       .eq('status', 'active')
       .is('deleted_at', null);
+    if (campaignsError) {
+      setLoadError(`案件一覧の取得に失敗しました: ${campaignsError.message}`);
+      setLoading(false);
+      return;
+    }
 
     const campaignIds = (campaignsData ?? []).map((c) => c.id);
 
@@ -154,6 +170,8 @@ export default function MonitorHome() {
         </Pressable>
       </View>
 
+      {loadError && <ErrorBanner message={loadError} />}
+
       <FlatList
         style={{ flex: 1 }}
         data={campaigns}
@@ -196,20 +214,7 @@ export default function MonitorHome() {
       />
       </View>
 
-      <BottomTabBar
-        items={[
-          { label: 'ホーム', href: '/monitor-home', icon: 'home-outline', activeIcon: 'home' },
-          { label: '提出履歴', href: '/submission-history', icon: 'time-outline', activeIcon: 'time' },
-          {
-            label: 'お知らせ',
-            href: '/announcements',
-            icon: 'notifications-outline',
-            activeIcon: 'notifications',
-            badge: unreadAnnouncements,
-          },
-          { label: 'プロフィール', href: '/monitor-profile', icon: 'person-outline', activeIcon: 'person' },
-        ]}
-      />
+      <BottomTabBar items={monitorTabItems(unreadAnnouncements)} />
     </Screen>
   );
 }

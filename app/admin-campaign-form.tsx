@@ -11,6 +11,7 @@ import {
   deriveCycleStatus,
   formatCampaignNo,
   generateCyclesAndTasks,
+  monitorDisplayName,
   suggestCampaignTitle,
 } from '../lib/campaigns';
 import { supabase } from '../lib/supabase';
@@ -29,9 +30,6 @@ type ProductSelection = {
 
 type MonitorOption = { id: string; name: string | null; nickname: string | null; instagramHandle: string | null };
 
-function monitorDisplayName(m: MonitorOption): string {
-  return m.name ?? (m.instagramHandle ? `@${m.instagramHandle}(本登録前)` : '(名前未登録)');
-}
 type ChildOption = { id: string; call_name: string };
 type FormFieldMaster = {
   key: string;
@@ -634,14 +632,19 @@ export default function AdminCampaignForm() {
     setEditLoading(true);
     setEditError(null);
 
-    const { data: campaign } = await supabase
+    const { data: campaign, error: campaignError } = await supabase
       .from('campaigns')
       .select(
-        'id, campaign_no, title, reminder_enabled, internal_memo, shooting_guideline, dropbox_base_path, recurrence_type, cycles_count, media_deadline_day, monitor:profiles(name)'
+        'id, campaign_no, title, reminder_enabled, internal_memo, shooting_guideline, dropbox_base_path, recurrence_type, cycles_count, media_deadline_day, monitor:profiles(name, instagram_handle)'
       )
       .eq('id', params.id as string)
       .maybeSingle();
 
+    if (campaignError) {
+      setEditError(`案件の取得に失敗しました: ${campaignError.message}`);
+      setEditLoading(false);
+      return;
+    }
     if (!campaign) {
       setEditError('案件が見つかりませんでした');
       setEditLoading(false);
@@ -678,7 +681,10 @@ export default function AdminCampaignForm() {
     setEditCampaign({
       id: campaign.id,
       campaignNo: campaign.campaign_no,
-      monitorName: (campaign as any).monitor?.name ?? null,
+      monitorName: monitorDisplayName({
+        name: (campaign as any).monitor?.name ?? null,
+        instagramHandle: (campaign as any).monitor?.instagram_handle ?? null,
+      }),
       productSummary,
       recurrenceSummary,
       dropboxBasePath: campaign.dropbox_base_path,

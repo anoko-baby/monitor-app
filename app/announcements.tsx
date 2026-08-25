@@ -3,8 +3,11 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 
+import { BottomTabBar } from '../components/BottomTabBar';
+import { ErrorBanner } from '../components/ErrorBanner';
 import { Screen } from '../components/Screen';
 import { supabase } from '../lib/supabase';
+import { monitorTabItems } from '../lib/tabItems';
 
 type AnnouncementRow = {
   targetId: string;
@@ -17,13 +20,17 @@ type AnnouncementRow = {
 export default function Announcements() {
   const [rows, setRows] = useState<AnnouncementRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [unreadAnnouncements, setUnreadAnnouncements] = useState(0);
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase
+    setLoadError(null);
+    const { data, error } = await supabase
       .from('announcement_targets')
       .select('id, read_at, announcements(title, sent_at)')
       .order('created_at', { ascending: false });
+    if (error) setLoadError(`お知らせ一覧の取得に失敗しました: ${error.message}`);
 
     setRows(
       (data ?? []).map((t: any) => ({
@@ -36,18 +43,31 @@ export default function Announcements() {
     setLoading(false);
   }
 
+  async function loadUnreadAnnouncements() {
+    const { count } = await supabase
+      .from('announcement_targets')
+      .select('id', { count: 'exact', head: true })
+      .is('read_at', null);
+    setUnreadAnnouncements(count ?? 0);
+  }
+
   useEffect(() => {
     load();
+    loadUnreadAnnouncements();
   }, []);
 
   return (
-    <Screen className="px-6 pt-6">
+    <Screen>
+      <View className="flex-1 px-6 pt-6">
       <Text className="font-heading text-title-lg text-ink mb-6">お知らせ</Text>
+
+      {loadError && <ErrorBanner message={loadError} />}
 
       {loading ? (
         <ActivityIndicator color="#7E8F86" />
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={rows}
           keyExtractor={(item) => item.targetId}
           ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: '#E7E1D6' }} />}
@@ -78,6 +98,9 @@ export default function Announcements() {
           )}
         />
       )}
+      </View>
+
+      <BottomTabBar items={monitorTabItems(unreadAnnouncements)} />
     </Screen>
   );
 }

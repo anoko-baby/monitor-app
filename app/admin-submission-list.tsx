@@ -2,11 +2,14 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Image, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
-import { AppButton } from '../components/AppButton';
+import { BottomTabBar } from '../components/BottomTabBar';
+import { ErrorBanner } from '../components/ErrorBanner';
+import { Screen } from '../components/Screen';
 import { TextField } from '../components/TextField';
 import { formatCampaignNo } from '../lib/campaigns';
 import { getThumbnailSignedUrl } from '../lib/mediaPipeline';
 import { supabase } from '../lib/supabase';
+import { ADMIN_TAB_ITEMS } from '../lib/tabItems';
 
 const PAGE_SIZE = 50;
 
@@ -66,6 +69,7 @@ function matchesStatusFilter(filter: StatusFilter, status: string | null, dueDat
 export default function AdminSubmissionList() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [keyword, setKeyword] = useState('');
   const [monitorFilter, setMonitorFilter] = useState('');
@@ -79,6 +83,7 @@ export default function AdminSubmissionList() {
 
   async function load() {
     setLoading(true);
+    setLoadError(null);
 
     let query = supabase.from('submission_list_view').select('*');
     if (monitorFilter) query = query.ilike('monitor_name', `%${monitorFilter}%`);
@@ -86,7 +91,8 @@ export default function AdminSubmissionList() {
     if (productFilter) query = query.ilike('product_title', `%${productFilter}%`);
     if (starOnly) query = query.eq('has_starred', true);
 
-    const { data } = await query.limit(500);
+    const { data, error } = await query.limit(500);
+    if (error) setLoadError(`全提出一覧の取得に失敗しました: ${error.message}`);
 
     const mapped: Row[] = (data ?? []).map((r) => ({
       cycleId: r.cycle_id!,
@@ -179,13 +185,15 @@ export default function AdminSubmissionList() {
   }
 
   return (
-    <View className="flex-1 bg-bg">
+    <Screen>
       <ScrollView
         className="px-6 pt-6"
         style={{ maxHeight: 320 }}
         keyboardShouldPersistTaps="handled"
       >
         <Text className="font-heading text-title-lg text-ink mb-4">全提出一覧</Text>
+
+        {loadError && <ErrorBanner message={loadError} />}
 
         <TextField label="キーワード検索(案件番号・案件名・モニター名・商品名)" value={keyword} onChangeText={setKeyword} />
         <TextField label="モニター名" value={monitorFilter} onChangeText={setMonitorFilter} />
@@ -257,6 +265,7 @@ export default function AdminSubmissionList() {
 
       <FlatList
         className="px-6"
+        style={{ flex: 1 }}
         data={visibleRows}
         keyExtractor={(item) => item.cycleId}
         ListEmptyComponent={
@@ -312,6 +321,8 @@ export default function AdminSubmissionList() {
           </View>
         )}
       />
-    </View>
+
+      <BottomTabBar items={ADMIN_TAB_ITEMS} />
+    </Screen>
   );
 }

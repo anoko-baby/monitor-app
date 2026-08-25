@@ -3,6 +3,7 @@
 // DB読み書きは呼び出し元(admin/staff)のJWTをそのまま転送し、RLSに従う(service roleは使わない)。
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { createDropboxFolder, getDropboxAccessToken, sanitizeDropboxPathSegment } from '../_shared/dropbox.ts';
+import { monitorDisplayName } from '../_shared/profiles.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -68,7 +69,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: monitor } = await db
     .from('profiles')
-    .select('name')
+    .select('name, instagram_handle')
     .eq('id', campaign.monitor_id)
     .maybeSingle();
 
@@ -119,7 +120,7 @@ Deno.serve(async (req: Request) => {
     `${product?.title || '商品名未設定'}_${variant?.sku || 'SKU未設定'}`
   );
   const monitorSegment = sanitizeDropboxPathSegment(
-    `${formatCampaignNo(campaign.campaign_no)}_${monitor?.name || 'モニター名未設定'}`
+    `${formatCampaignNo(campaign.campaign_no)}_${monitorDisplayName(monitor)}`
   );
 
   const basePath = `/anoko_monitor/${brandSegment}/${productSegment}/${monitorSegment}`;

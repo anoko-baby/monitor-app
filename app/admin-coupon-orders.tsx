@@ -2,6 +2,8 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
+import { ErrorBanner } from '../components/ErrorBanner';
+import { monitorDisplayName } from '../lib/campaigns';
 import { supabase } from '../lib/supabase';
 
 type CouponOrder = {
@@ -26,13 +28,18 @@ const STATUS_LABEL: Record<CouponOrder['status'], string> = {
 export default function AdminCouponOrders() {
   const [orders, setOrders] = useState<CouponOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   async function loadOrders() {
     setLoading(true);
-    const { data } = await supabase
+    setLoadError(null);
+    const { data, error } = await supabase
       .from('coupon_orders')
-      .select('id, order_no, ordered_at, coupon_code, customer_name, monitor_id, line_items, status, monitor:profiles(name)')
+      .select(
+        'id, order_no, ordered_at, coupon_code, customer_name, monitor_id, line_items, status, monitor:profiles(name, instagram_handle)'
+      )
       .order('ordered_at', { ascending: false });
+    if (error) setLoadError(`クーポン注文一覧の取得に失敗しました: ${error.message}`);
     setOrders(
       (data ?? []).map((o: any) => ({
         id: o.id,
@@ -41,7 +48,7 @@ export default function AdminCouponOrders() {
         coupon_code: o.coupon_code,
         customer_name: o.customer_name,
         monitor_id: o.monitor_id,
-        monitor_name: o.monitor?.name ?? null,
+        monitor_name: o.monitor ? monitorDisplayName({ name: o.monitor.name, instagramHandle: o.monitor.instagram_handle }) : null,
         line_items: o.line_items,
         status: o.status,
       }))
@@ -74,6 +81,7 @@ export default function AdminCouponOrders() {
 
   return (
     <View className="flex-1 bg-bg px-6 pt-6">
+      {loadError && <ErrorBanner message={loadError} />}
       {loading && <Text className="font-body text-caption text-ink-soft">読み込み中…</Text>}
 
       <FlatList
