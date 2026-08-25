@@ -5,9 +5,14 @@ export function formatCampaignNo(campaignNo: number): string {
 }
 
 // パス使用不可文字(/ \ : * ? " < > |)を「-」に置換する(仕様書 v1.8 6.1)。
-// supabase/functions/dropbox-create-campaign-folders/index.ts と同じロジック(要同期)。
+// 末尾の「.」やスペースはWindowsのファイル/フォルダ名として不正(Dropboxのデスクトップアプリが
+// ローカル同期時に末尾を「_」へ勝手に置き換えてしまい紛らわしい表示になる)ため、あわせて除去する。
+// supabase/functions/_shared/dropbox.ts と同じロジック(要同期)。
 export function sanitizeDropboxPathSegment(segment: string): string {
-  return segment.replace(/[/\\:*?"<>|]/g, '-').trim();
+  return segment
+    .replace(/[/\\:*?"<>|]/g, '-')
+    .trim()
+    .replace(/[.\s]+$/, '');
 }
 
 // 回次フォルダ名(例: 第2回_20260910)。dropbox-create-campaign-foldersが作成時に使った命名と

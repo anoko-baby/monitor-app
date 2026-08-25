@@ -504,6 +504,33 @@ Dropbox連携先の切り替え作業中に試行された提出ファイル(`IM
 
 ---
 
+## 案件一覧・回次一覧のデザイン刷新、Dropboxフォルダ構成の見直し、提出済みファイルの削除制限(2026-08-26)
+
+「案件一覧ページについて、モニターを依頼されている商品名・そのサムネイルを表示して、なんの案件かぱっと見でわかるようなデザインに刷新してほしい」等の実機フィードバックに対応。
+
+**モニター側「あなたの案件」一覧(`app/monitor-home.tsx`)**
+- 各行に商品サムネイル(`products.image_url`)+商品名を表示するよう刷新(商品名をタイトル、案件名をその下の小さいキャプションに)。何の案件かアイコンではなく画像でぱっと見て分かるようにした
+- 「未提出2」のような件数バッジをやめ、必要な提出内容ごとに「データ提出」「Instagram投稿」バッジ(`components/StatusPill.tsx`)を表示するよう変更。期限超過があれば赤系(overdue)、無ければアクセントカラーで表示。提出物が無ければ「提出済み」バッジを表示
+
+**案件詳細の回次一覧(`app/campaign-detail.tsx`)**
+- データ提出/SNS投稿それぞれをボタン風の行(アイコン+見出し+期限+ステータスバッジ)に変更し、テキストのみだった従来より区別しやすくした。データ提出は画像アイコン、Instagram投稿はInstagramロゴアイコンで視覚的に分離。ステータスに応じてバッジの色を変える`taskStatusTone()`ヘルパーを追加(差し戻し=rejected、提出済み/確認済み=accent、期限超過=overdue、それ以外=neutral)
+
+**提出済みファイルの削除を制限(`app/submission-form.tsx` + migration)**
+- 「提出済みのページでは、モニター側では一度提出したものの画像の削除はできないようにしたい」に対応。従来はタスクが`approved`(確認済み)でなければ削除ボタンを表示していたため、`submitted`(提出済み・確認待ち)の状態でも削除できてしまっていた
+- クライアント側: 削除ボタンの表示条件を`taskStatus === 'pending' || taskStatus === 'rejected'`(下書き中・差し戻され再提出中の時だけ)に変更
+- DB側: migration `20260826000001_restrict_submission_files_delete_after_submit.sql`で`submission_files`のdelete RLSポリシーも同じ条件に絞り込み(UIだけでなくAPIレベルでも提出済みファイルを削除できないようにするため)。**要 `npx supabase db push`**
+
+**Dropboxフォルダ構成の見直み(`supabase/functions/dropbox-create-campaign-folders/index.ts`)**
+- 「その中のフォルダも、SKUごとではなく商品ごとにフォルダ、案件No＋名前ではなくInstagramアカウント名にしておきたい」に対応
+- 商品フォルダ: `{商品名}_{SKU}` → `{商品名}`のみ(同じ商品の別バリアントは同じフォルダに集約)
+- 案件フォルダ: `{案件番号}_{モニター名}` → `{案件番号}_{Instagramアカウント名}`(Instagramアカウント未設定の場合は氏名等にフォールバック。案件番号は残す方針で確認済み)
+- `sanitizeDropboxPathSegment`(`lib/campaigns.ts`・`supabase/functions/_shared/dropbox.ts`の両方、要同期)に、末尾の「.」やスペースを除去する処理を追加。ブランド名が「ANOKO.」のように末尾がピリオドの場合、Windows版Dropboxデスクトップアプリがローカル同期時に末尾を「_」へ勝手に置き換えてしまい「ANOKO_」という紛らわしい表示になっていた不具合の修正(実機で確認・再現)
+- 既存案件(切り替え前に作成済みのテスト案件)の`dropbox_base_path`は今回は更新していない(旧構成のまま)。新規作成する案件から新しい構成になる
+
+`npx tsc --noEmit`・`npx expo export -p web`とも通過を確認済み。実機での見た目確認は未実施。
+
+---
+
 ## 未確定・要確認事項の記録
 
 - Dropbox Scoped App / Supabaseプロジェクトは未作成(2026-07-09時点)。M1着手前に準備が必要

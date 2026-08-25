@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Image, Pressable, Text, View } from 'react-native';
 
 import { BottomTabBar } from '../components/BottomTabBar';
 import { CycleDots } from '../components/CycleDots';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { HeroProfileBadge } from '../components/HeroProfileBadge';
 import { HeroScreen } from '../components/HeroScreen';
+import { StatusPill } from '../components/StatusPill';
 import { CycleDotStatus, deriveCycleStatus } from '../lib/campaigns';
 import { supabase } from '../lib/supabase';
 import { monitorTabItems } from '../lib/tabItems';
@@ -17,7 +18,13 @@ type CampaignRow = {
   id: string;
   title: string;
   productLabel: string;
+  productImageUrl: string | null;
   nextDueDate: string | null;
+  // 「未提出N件」という件数ではなく、何を提出すべきかがぱっと見でわかるようバッジで表示するための
+  // フラグ(実機フィードバック)。overdueは期限超過しているタスクがあるかどうか(バッジの色分け用)。
+  needsMedia: boolean;
+  needsSns: boolean;
+  overdue: boolean;
   pendingCount: number;
   cycleStatuses: CycleDotStatus[];
 };
@@ -102,26 +109,30 @@ export default function MonitorHome() {
       : { data: [] as any[] };
     const productIds = Array.from(new Set((variantsData ?? []).map((v) => v.product_id)));
     const { data: productsData } = productIds.length
-      ? await supabase.from('products').select('id, title').in('id', productIds)
+      ? await supabase.from('products').select('id, title, image_url').in('id', productIds)
       : { data: [] as any[] };
     const productById = new Map((productsData ?? []).map((p) => [p.id, p]));
     const variantProductId = new Map((variantsData ?? []).map((v) => [v.id, v.product_id]));
 
     const firstProductLabelByCampaign = new Map<string, string>();
+    const firstProductImageByCampaign = new Map<string, string | null>();
     for (const link of variantLinks ?? []) {
       if (firstProductLabelByCampaign.has(link.campaign_id)) continue;
       const productId = variantProductId.get(link.variant_id);
-      const title = productId ? productById.get(productId)?.title : null;
-      firstProductLabelByCampaign.set(link.campaign_id, title ?? '(商品情報なし)');
+      const product = productId ? productById.get(productId) : null;
+      firstProductLabelByCampaign.set(link.campaign_id, product?.title ?? '(商品情報なし)');
+      firstProductImageByCampaign.set(link.campaign_id, product?.image_url ?? null);
     }
 
     const { data: cyclesData } = campaignIds.length
       ? await supabase
           .from('cycles')
-          .select('id, campaign_id, cycle_no, tasks(status, due_date)')
+          .select('id, campaign_id, cycle_no, tasks(type, status, due_date)')
           .in('campaign_id', campaignIds)
           .order('cycle_no', { ascending: true })
       : { data: [] as any[] };
+
+    const today = new Date().toISOString().slice(0, 10);
 
     const rows: CampaignRow[] = (campaignsData ?? []).map((c) => {
       const cyclesForCampaign = (cyclesData ?? []).filter((cy: any) => cy.campaign_id === c.id);
@@ -139,7 +150,11 @@ export default function MonitorHome() {
         id: c.id,
         title: c.title,
         productLabel: firstProductLabelByCampaign.get(c.id) ?? '(商品情報なし)',
+        productImageUrl: firstProductImageByCampaign.get(c.id) ?? null,
         nextDueDate,
+        needsMedia: pendingTasks.some((t: any) => t.type === 'media'),
+        needsSns: pendingTasks.some((t: any) => t.type === 'sns'),
+        overdue: pendingTasks.some((t: any) => t.due_date < today),
         pendingCount: pendingTasks.length,
         cycleStatuses,
       };
@@ -219,29 +234,55 @@ export default function MonitorHome() {
               renderItem={({ item }) => (
                 <Pressable
                   onPress={() => setView({ type: 'campaign', id: item.id })}
-                  className="bg-surface rounded-card border-hairline border-line px-4 py-4 mb-3"
+                  className="bg-surface rounded-card border-hairline border-line p-3 mb-3 flex-row"
+                  style={{ gap: 12 }}
                 >
-                  <Text className="font-body-medium text-body text-ink mb-1">{item.title}</Text>
-                  <Text className="font-body text-caption text-ink-soft mb-2">{item.productLabel}</Text>
+                  {item.productImageUrl ? (
+                    <Image
+                      source={{ uri: item.productImageUrl }}
+                      style={{ width: 64, height: 64, borderRadius: 10 }}
+                    />
+                  ) : (
+                    <View
+                      style={{ width: 64, height: 64, borderRadius: 10 }}
+                      className="bg-line items-center justify-center"
+                    >
+                      <Text className="font-body text-tiny text-ink-soft">No Image</Text>
+                    </View>
+                  )}
 
-                  <View className="flex-row items-center justify-between mb-2">
+                  <View className="flex-1">
+                    <Text className="font-body-medium text-body text-ink mb-0.5" numberOfLines={1}>
+                      {item.productLabel}
+                    </Text>
+                    <Text className="font-body text-tiny text-ink-soft mb-2" numberOfLines={1}>
+                      {item.title}
+                    </Text>
+
+                    <View className="flex-row flex-wrap items-center mb-2" style={{ gap: 6 }}>
+                      {item.needsMedia && (
+                        <StatusPill label="データ提出" tone={item.overdue ? 'overdue' : 'accent'} />
+                      )}
+                      {item.needsSns && (
+                        <StatusPill label="Instagram投稿" tone={item.overdue ? 'overdue' : 'accent'} />
+                      )}
+                      {item.pendingCount === 0 && <StatusPill label="提出済み" tone="neutral" />}
+                    </View>
+
                     {item.nextDueDate ? (
-                      <Text className="font-body-medium text-title text-status-overdue">
+                      <Text className="font-body-medium text-caption text-status-overdue">
                         次の期限: {formatDueDate(item.nextDueDate)}
                       </Text>
                     ) : (
-                      <Text className="font-body text-caption text-ink-soft">未提出の項目はありません</Text>
+                      <Text className="font-body text-tiny text-ink-soft">未提出の項目はありません</Text>
                     )}
-                    {item.pendingCount > 0 && (
-                      <View className="bg-status-overdue/10 rounded-full px-3 py-1">
-                        <Text className="font-body-medium text-caption text-status-overdue">
-                          未提出 {item.pendingCount}
-                        </Text>
+
+                    {item.cycleStatuses.length > 0 && (
+                      <View className="mt-2">
+                        <CycleDots statuses={item.cycleStatuses} />
                       </View>
                     )}
                   </View>
-
-                  {item.cycleStatuses.length > 0 && <CycleDots statuses={item.cycleStatuses} />}
                 </Pressable>
               )}
             />
