@@ -198,10 +198,16 @@ export default function MonitorHome() {
 
       <BottomTabBar
         items={[
-          { label: 'ホーム', href: '/monitor-home' },
-          { label: '提出履歴', href: '/submission-history' },
-          { label: 'お知らせ', href: '/announcements', badge: unreadAnnouncements },
-          { label: 'プロフィール', href: '/monitor-profile' },
+          { label: 'ホーム', href: '/monitor-home', icon: 'home-outline', activeIcon: 'home' },
+          { label: '提出履歴', href: '/submission-history', icon: 'time-outline', activeIcon: 'time' },
+          {
+            label: 'お知らせ',
+            href: '/announcements',
+            icon: 'notifications-outline',
+            activeIcon: 'notifications',
+            badge: unreadAnnouncements,
+          },
+          { label: 'プロフィール', href: '/monitor-profile', icon: 'person-outline', activeIcon: 'person' },
         ]}
       />
     </Screen>

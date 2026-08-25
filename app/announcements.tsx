@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
@@ -49,14 +50,19 @@ export default function Announcements() {
         <FlatList
           data={rows}
           keyExtractor={(item) => item.targetId}
+          ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: '#E7E1D6' }} />}
           ListEmptyComponent={
             <Text className="font-body text-caption text-ink-soft">お知らせはまだありません</Text>
           }
           renderItem={({ item }) => (
             <Pressable
               onPress={() => router.push({ pathname: '/announcement-detail', params: { targetId: item.targetId } })}
-              className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2 flex-row items-center justify-between"
+              className="flex-row items-center py-3"
+              style={{ gap: 12 }}
             >
+              <View className="bg-accent/15 rounded-full items-center justify-center" style={{ width: 40, height: 40 }}>
+                <Ionicons name="megaphone-outline" size={18} color="#4E5B54" />
+              </View>
               <View className="flex-1 pr-2">
                 <Text
                   className={`font-body-medium text-body ${item.isUnread ? 'text-ink' : 'text-ink-soft'}`}

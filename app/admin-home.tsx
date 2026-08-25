@@ -45,11 +45,21 @@ export default function AdminHome() {
 
       <BottomTabBar
         items={[
-          { label: 'ホーム', href: '/admin-home' },
-          { label: '案件一覧', href: '/admin-campaign-list' },
-          { label: '全提出一覧', href: '/admin-submission-list' },
-          { label: 'モニター一覧', href: '/admin-monitor-list' },
-          { label: 'お知らせ配信', href: '/admin-announcement-list' },
+          { label: 'ホーム', href: '/admin-home', icon: 'home-outline', activeIcon: 'home' },
+          { label: '案件一覧', href: '/admin-campaign-list', icon: 'briefcase-outline', activeIcon: 'briefcase' },
+          {
+            label: '提出一覧',
+            href: '/admin-submission-list',
+            icon: 'document-text-outline',
+            activeIcon: 'document-text',
+          },
+          { label: 'モニター', href: '/admin-monitor-list', icon: 'people-outline', activeIcon: 'people' },
+          {
+            label: 'お知らせ',
+            href: '/admin-announcement-list',
+            icon: 'megaphone-outline',
+            activeIcon: 'megaphone',
+          },
         ]}
       />
     </Screen>

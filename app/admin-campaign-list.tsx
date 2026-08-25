@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { CycleDots } from '../components/CycleDots';
+import { StatusPill } from '../components/StatusPill';
 import { CycleDotStatus, deriveCycleStatus, formatCampaignNo } from '../lib/campaigns';
 import { supabase } from '../lib/supabase';
 
@@ -100,9 +101,10 @@ export default function AdminCampaignList() {
               <Text className="font-body text-caption text-ink-soft">
                 {formatCampaignNo(item.campaignNo)}
               </Text>
-              <Text className="font-body text-caption text-ink-soft">
-                {STATUS_LABEL[item.status]}
-              </Text>
+              <StatusPill
+                label={STATUS_LABEL[item.status]}
+                tone={item.status === 'active' ? 'accent' : item.status === 'cancelled' ? 'rejected' : 'neutral'}
+              />
             </View>
             <Text className="font-body-medium text-body text-ink mb-1">{item.title}</Text>
             <Text className="font-body text-caption text-ink-soft mb-2">
