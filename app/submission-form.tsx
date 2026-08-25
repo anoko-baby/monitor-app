@@ -451,6 +451,8 @@ export default function SubmissionForm() {
         .eq('id', taskId);
       if (taskError) throw new Error('タスクの更新に失敗しました');
 
+      await supabase.functions.invoke('notify-dispatch', { body: { event: 'task_submitted', taskId } });
+
       await clearDraft(taskId);
       setPendingFiles([]);
       setSubmitted(true);

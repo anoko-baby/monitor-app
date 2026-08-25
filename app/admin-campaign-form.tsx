@@ -607,6 +607,9 @@ export default function AdminCampaignForm() {
         return;
       }
 
+      // N1: 案件アサイン通知。失敗しても案件作成自体は成功しているため無視して続行する。
+      await supabase.functions.invoke('notify-dispatch', { body: { event: 'campaign_assigned', campaignId } });
+
       router.replace('/admin-campaign-list');
     } catch (err: any) {
       setSubmitError(err?.message ?? '案件の作成に失敗しました');

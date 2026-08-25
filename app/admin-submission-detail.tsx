@@ -262,6 +262,9 @@ export default function AdminSubmissionDetail() {
         .update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewer_id: actorId })
         .eq('id', taskId);
       if (error) throw new Error('確認済みへの更新に失敗しました');
+      await supabase.functions.invoke('notify-dispatch', {
+        body: { event: 'task_reviewed', taskId, action: 'approved' },
+      });
       await load();
     } catch (err: any) {
       setActionError(err?.message ?? '確認済みへの更新に失敗しました');
@@ -300,6 +303,9 @@ export default function AdminSubmissionDetail() {
         })
         .eq('id', taskId);
       if (error) throw new Error('差し戻しの更新に失敗しました');
+      await supabase.functions.invoke('notify-dispatch', {
+        body: { event: 'task_reviewed', taskId, action: 'rejected' },
+      });
       setRejectModalOpen(false);
       setRejectComment('');
       setRejectDueDate('');

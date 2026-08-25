@@ -25,6 +25,7 @@ function formatDueDate(dateStr: string): string {
 export default function MonitorHome() {
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [unreadAnnouncements, setUnreadAnnouncements] = useState(0);
 
   async function load() {
     setLoading(true);
@@ -124,8 +125,17 @@ export default function MonitorHome() {
     setLoading(false);
   }
 
+  async function loadUnreadAnnouncements() {
+    const { count } = await supabase
+      .from('announcement_targets')
+      .select('id', { count: 'exact', head: true })
+      .is('read_at', null);
+    setUnreadAnnouncements(count ?? 0);
+  }
+
   useEffect(() => {
     load();
+    loadUnreadAnnouncements();
   }, []);
 
   async function handleSignOut() {
@@ -137,7 +147,13 @@ export default function MonitorHome() {
     <Screen className="px-6 pt-6">
       <View className="flex-row items-center justify-between mb-6">
         <Text className="font-heading text-title-lg text-ink">あなたの案件</Text>
-        <View className="flex-row" style={{ gap: 16 }}>
+        <View className="flex-row items-center" style={{ gap: 16 }}>
+          <Pressable onPress={() => router.push('/announcements')} className="flex-row items-center">
+            <Text className="font-body text-caption text-accent-ink">お知らせ</Text>
+            {unreadAnnouncements > 0 && (
+              <View className="bg-status-overdue rounded-full w-2 h-2 ml-1" />
+            )}
+          </Pressable>
           <Pressable onPress={() => router.push('/submission-history')}>
             <Text className="font-body text-caption text-accent-ink">提出履歴</Text>
           </Pressable>

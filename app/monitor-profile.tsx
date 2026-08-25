@@ -6,6 +6,7 @@ import { AppButton } from '../components/AppButton';
 import { ChildrenManager } from '../components/ChildrenManager';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { TextField } from '../components/TextField';
+import { registerPushTokenForCurrentUser } from '../lib/push';
 import { supabase } from '../lib/supabase';
 
 type OwnProfile = {
@@ -39,6 +40,9 @@ export default function MonitorProfile() {
 
       const permission = await Notifications.getPermissionsAsync();
       setNotifGranted(permission.status === 'granted');
+      if (permission.status === 'granted') {
+        await registerPushTokenForCurrentUser();
+      }
 
       setLoading(false);
     })();

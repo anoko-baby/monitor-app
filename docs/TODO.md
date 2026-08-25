@@ -176,7 +176,7 @@ Dropboxのリフレッシュトークンと同じ考え方)。
 
 ---
 
-## M8. 通知+お知らせ配信
+## M8. 通知+お知らせ配信 ✅実装済み(2026-08-25)・実機確認待ち
 
 - プッシュ通知(N1・N2・N3・N4・N5・N6・N7・N9・N10・N11・N12)+ Supabase Cron設定
 - お知らせ作成・配信画面(全モニター/個別選択、リンクボタン、対象人数プレビュー)+ モニター側お知らせ一覧・詳細(未読バッジ)
@@ -184,6 +184,23 @@ Dropboxのリフレッシュトークンと同じ考え方)。
 **完了条件**
 - 実機で各トリガー(アサイン・差し戻し・検収完了・期限リマインド・期限超過督促・お知らせ配信)でPush通知が届く
 - お知らせ配信で対象プレビュー→送信→モニター側で既読管理ができる
+
+**実装メモ**
+- DBは`notification_templates`(N1〜N7,N9〜N12のテンプレをシード。N9はannouncements自体のtitle/bodyを都度使うためプレースホルダー行のみ)/`notification_logs`/`app_settings`(admin onlyのRLS。リマインド日程[7,1]・超過督促+2日・到着確認5日等をシード)/`announcements`/`announcement_targets`を新設
+- 即時通知(N1案件アサイン・N3差し戻し・N4確認済み・N5モニター提出・N9お知らせ配信)は`notify-dispatch` Edge Functionを新設し、該当する各画面(案件作成・検収・データ/SNS提出・お知らせ配信)から操作成功後に呼び出す方式にした。呼び出し元のJWTで「本人か・権限があるか」を確認したうえで、push_token取得・送信・ログ記録のみservice roleで行う(N5はモニターがstaff/adminのpush_tokenを読む必要があり、モニターのRLSでは読めないため)
+- 日次通知(N2期限7日前/前日・N6期限超過督促・N7期限超過報告・N10到着確認リマインド)は`notify-cron`、外部連携異常検知(N12: Dropboxトークン失効/Shopify APIエラー/Dropbox容量80%超過)は`notify-health-check`をそれぞれ新設。pg_cron+pg_net(Supabase公式のEdge Function定期実行パターン)で毎朝9:00 JST(=00:00 UTC)に起動する設定をmigrationに含めた
+- Cron用Edge Functionはservice roleではなく`CRON_SECRET`という共有シークレット(ヘッダー`x-cron-secret`)で認証する。値そのものをmigrationやチャットに含めないため、**適用後に一度だけ、ご自身のターミナル/SQL Editorから以下を実行してください**:
+  ```sql
+  select vault.create_secret('<任意のランダム文字列>', 'cron_secret');
+  ```
+  ```
+  npx supabase secrets set CRON_SECRET="<vaultに保存したのと同じ値>"
+  ```
+- N11(クーポン注文検知)は`shopify-webhook`に直接追加(既存のservice role実装のまま)。Webhookの再送で同じ注文が再度届いても、初回検知時のみ通知するようにした
+- push_token取得(`lib/push.ts`)は`expo-notifications`の`getExpoPushTokenAsync({projectId})`を使うが、**EASのprojectIdが未設定の間は静かにスキップする**実装にしている。実際にPushが届くようになるのはM9でEASプロジェクトを作成(`eas init`など)した後。それまでは通知許可は取得・保存されるが、push_tokenは空のままになる
+- 管理者/スタッフはこれまで通知許可を求めていなかった(N5/N7/N11/N12の宛先になるため今回追加)。ログイン成功時に許可リクエスト+トークン登録を行うが、モニターと異なりブロッキングにはしていない(仕様書3.8はモニターの必須オンボーディングのみを求めている)
+- お知らせは「作成=即配信」で下書き状態を持たない(3.9の要求どおり、作成画面内でプレビュー→送信の2ステップにした)
+- `docs/TODO.md`未確定事項として残す: 実機でのPush到達確認はEASプロジェクト作成後(M9着手時)にまとめて行う想定
 
 ---
 

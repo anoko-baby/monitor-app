@@ -38,6 +38,8 @@ export default function RootLayout() {
         <Stack.Screen name="submission-form" options={{ title: '提出する' }} />
         <Stack.Screen name="sns-submission-form" options={{ title: 'SNS投稿記録' }} />
         <Stack.Screen name="submission-history" options={{ title: '提出履歴' }} />
+        <Stack.Screen name="announcements" options={{ title: 'お知らせ' }} />
+        <Stack.Screen name="announcement-detail" options={{ title: 'お知らせ詳細' }} />
         <Stack.Screen name="admin-home" options={{ headerShown: false }} />
         <Stack.Screen name="admin-invite-issue" options={{ title: 'モニターを招待する' }} />
         <Stack.Screen name="admin-monitor-list" options={{ title: 'モニター一覧' }} />
@@ -50,6 +52,8 @@ export default function RootLayout() {
         <Stack.Screen name="admin-campaign-form" options={{ title: '案件作成・編集' }} />
         <Stack.Screen name="admin-submission-list" options={{ title: '全提出一覧' }} />
         <Stack.Screen name="admin-submission-detail" options={{ title: '提出詳細・検収' }} />
+        <Stack.Screen name="admin-announcement-list" options={{ title: 'お知らせ配信' }} />
+        <Stack.Screen name="admin-announcement-form" options={{ title: 'お知らせ作成・配信' }} />
         <Stack.Screen name="dev-upload-test" options={{ title: 'Dropboxアップロード検証(開発用)' }} />
       </Stack>
     </SafeAreaProvider>

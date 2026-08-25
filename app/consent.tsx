@@ -5,6 +5,7 @@ import { ScrollView, Switch, Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { registerPushTokenForCurrentUser } from '../lib/push';
 import { supabase } from '../lib/supabase';
 
 export default function Consent() {
@@ -39,6 +40,10 @@ export default function Consent() {
           status: 'active',
         })
         .eq('auth_user_id', session.user.id);
+    }
+
+    if (granted) {
+      await registerPushTokenForCurrentUser();
     }
 
     setSubmitting(false);
