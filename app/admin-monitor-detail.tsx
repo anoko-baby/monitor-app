@@ -24,8 +24,8 @@ type MonitorProfile = {
   consent_ad: boolean;
 };
 
-export default function AdminMonitorDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+// モニター詳細の本体。単独ルートでもadmin-monitor-listのシート内埋め込みでも使う共通コンポーネント。
+export function AdminMonitorDetailContent({ id }: { id: string }) {
   const [profile, setProfile] = useState<MonitorProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -66,18 +66,17 @@ export default function AdminMonitorDetail() {
 
   if (loading || !profile) {
     return (
-      <View className="flex-1 bg-bg items-center justify-center">
+      <View className="flex-1 items-center justify-center py-12">
         <ActivityIndicator color="#7E8F86" />
       </View>
     );
   }
 
   return (
-    <HeroScreen
-      title={profileDisplayName({ name: profile.name, nickname: profile.nickname, instagramHandle: profile.instagram_handle })}
-      onBack={() => goBackOrReplace('/admin-monitor-list')}
-    >
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
+      <Text className="font-heading text-title text-ink mb-4">
+        {profileDisplayName({ name: profile.name, nickname: profile.nickname, instagramHandle: profile.instagram_handle })}
+      </Text>
       <TextField
         label="Instagramアカウント名"
         value={profile.instagram_handle ?? ''}
@@ -142,6 +141,16 @@ export default function AdminMonitorDetail() {
 
       <AchievementSection monitorId={profile.id} />
     </ScrollView>
+  );
+}
+
+// 単独ルートとしてアクセスされた場合のフォールバック。admin-monitor-listのシートに埋め込まれる
+// 場合はAdminMonitorDetailContentを直接使う。
+export default function AdminMonitorDetail() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  return (
+    <HeroScreen title="モニター詳細" onBack={() => goBackOrReplace('/admin-monitor-list')}>
+      <AdminMonitorDetailContent id={id} />
     </HeroScreen>
   );
 }

@@ -84,19 +84,32 @@ const TASK_STATUS_LABEL: Record<string, string> = {
   cancelled: 'キャンセル',
 };
 
-// 案件作成・編集(仕様書 v1.8 画面一覧4)。idパラメータが無ければ新規作成、あれば編集(基本情報の編集+回次/タスクの閲覧)。
-// クーポン注文の「案件化する」からの遷移時は sourceOrderId/monitorId/shippedAt/shipmentOrderNo/lineItems で prefill する。
-export default function AdminCampaignForm() {
-  const params = useLocalSearchParams<{
-    id?: string;
-    sourceOrderId?: string;
-    monitorId?: string;
-    monitorName?: string;
-    shipmentOrderNo?: string;
-    shippedAt?: string;
-    lineItems?: string;
-  }>();
-  const isEdit = !!params.id;
+type AdminCampaignFormContentProps = {
+  id?: string;
+  initialSourceOrderId?: string;
+  initialMonitorId?: string;
+  initialMonitorName?: string;
+  initialShipmentOrderNo?: string;
+  initialShippedAt?: string;
+  initialLineItems?: string;
+  onSaved?: () => void;
+};
+
+// 案件作成・編集の本体(仕様書 v1.8 画面一覧4)。idが無ければ新規作成、あれば編集(基本情報の編集+回次/タスクの閲覧)。
+// 単独ルートでもadmin-campaign-listのシート内埋め込みでも使う共通コンポーネント。
+// クーポン注文の「案件化する」からの遷移時は initialSourceOrderId/initialMonitorId/initialShippedAt/
+// initialShipmentOrderNo/initialLineItems で prefill する。
+export function AdminCampaignFormContent({
+  id,
+  initialSourceOrderId,
+  initialMonitorId,
+  initialMonitorName,
+  initialShipmentOrderNo,
+  initialShippedAt,
+  initialLineItems,
+  onSaved,
+}: AdminCampaignFormContentProps) {
+  const isEdit = !!id;
 
   // ---- 編集モード ----
   const [editCampaign, setEditCampaign] = useState<EditCampaign | null>(null);
@@ -195,15 +208,15 @@ export default function AdminCampaignForm() {
   }
 
   function applyPrefillFromParams() {
-    if (params.sourceOrderId) setSourceOrderId(params.sourceOrderId);
-    if (params.shippedAt) setShippedAt(params.shippedAt);
-    if (params.shipmentOrderNo) setShipmentOrderNo(params.shipmentOrderNo);
-    if (params.monitorId && params.monitorName) {
-      setSelectedMonitor({ id: params.monitorId, name: params.monitorName, nickname: null, instagramHandle: null });
+    if (initialSourceOrderId) setSourceOrderId(initialSourceOrderId);
+    if (initialShippedAt) setShippedAt(initialShippedAt);
+    if (initialShipmentOrderNo) setShipmentOrderNo(initialShipmentOrderNo);
+    if (initialMonitorId && initialMonitorName) {
+      setSelectedMonitor({ id: initialMonitorId, name: initialMonitorName, nickname: null, instagramHandle: null });
     }
-    if (params.lineItems) {
+    if (initialLineItems) {
       try {
-        const items = JSON.parse(params.lineItems) as any[];
+        const items = JSON.parse(initialLineItems) as any[];
         const mapped: ProductSelection[] = items.map((li, idx) => ({
           key: `coupon-${idx}`,
           shopifyProductId: li.product_id ? `gid://shopify/Product/${li.product_id}` : null,
@@ -393,6 +406,11 @@ export default function AdminCampaignForm() {
       else next.add(key);
       return next;
     });
+  }
+
+  function finishAndReturn() {
+    if (onSaved) onSaved();
+    else router.replace('/admin-campaign-list');
   }
 
   async function handleSubmit() {
@@ -616,14 +634,14 @@ export default function AdminCampaignForm() {
         setSubmitError(
           '案件は作成されましたが、Dropboxフォルダの作成に失敗しました。案件一覧から確認してください。'
         );
-        router.replace('/admin-campaign-list');
+        finishAndReturn();
         return;
       }
 
       // N1: 案件アサイン通知。失敗しても案件作成自体は成功しているため無視して続行する。
       await supabase.functions.invoke('notify-dispatch', { body: { event: 'campaign_assigned', campaignId } });
 
-      router.replace('/admin-campaign-list');
+      finishAndReturn();
     } catch (err: any) {
       setSubmitError(err?.message ?? '案件の作成に失敗しました');
     } finally {
@@ -640,7 +658,7 @@ export default function AdminCampaignForm() {
       .select(
         'id, campaign_no, title, reminder_enabled, internal_memo, shooting_guideline, dropbox_base_path, recurrence_type, cycles_count, media_deadline_day, monitor:profiles(name, instagram_handle)'
       )
-      .eq('id', params.id as string)
+      .eq('id', id as string)
       .maybeSingle();
 
     if (campaignError) {
@@ -657,7 +675,7 @@ export default function AdminCampaignForm() {
     const { data: variantLinks } = await supabase
       .from('campaign_variants')
       .select('variant_id')
-      .eq('campaign_id', params.id as string);
+      .eq('campaign_id', id as string);
 
     let productSummary = '(商品情報なし)';
     if (variantLinks && variantLinks.length > 0) {
@@ -701,7 +719,7 @@ export default function AdminCampaignForm() {
     const { data: cycles } = await supabase
       .from('cycles')
       .select('id, cycle_no, label, tasks(type, due_date, status)')
-      .eq('campaign_id', params.id as string)
+      .eq('campaign_id', id as string)
       .order('cycle_no', { ascending: true });
 
     const rows: CycleRow[] = (cycles ?? []).map((c: any) => {
@@ -748,16 +766,15 @@ export default function AdminCampaignForm() {
     }
 
     return (
-      <HeroScreen
-        title={title || '案件編集'}
-        subtitle={`${formatCampaignNo(editCampaign.campaignNo)} ・ ${editCampaign.monitorName ?? '(モニター不明)'}`}
-        onBack={() => goBackOrReplace('/admin-campaign-list')}
-      >
       <ScrollView
-      className="flex-1"
-      contentContainerStyle={{ padding: 24 }}
-      keyboardShouldPersistTaps="handled"
-    >
+        className="flex-1"
+        contentContainerStyle={{ padding: 24 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text className="font-heading text-title text-ink mb-1">{title || '案件編集'}</Text>
+        <Text className="font-body text-caption text-ink-soft mb-4">
+          {formatCampaignNo(editCampaign.campaignNo)} ・ {editCampaign.monitorName ?? '(モニター不明)'}
+        </Text>
         <Text className="font-body text-caption text-ink-soft mb-1">{editCampaign.productSummary}</Text>
         <Text className="font-body text-caption text-ink-soft mb-6">{editCampaign.recurrenceSummary}</Text>
 
@@ -818,17 +835,16 @@ export default function AdminCampaignForm() {
           </Text>
         )}
       </ScrollView>
-      </HeroScreen>
     );
   }
 
   return (
-    <HeroScreen title="新規案件作成" onBack={() => goBackOrReplace('/admin-campaign-list')}>
     <ScrollView
       className="flex-1"
       contentContainerStyle={{ padding: 24 }}
       keyboardShouldPersistTaps="handled"
     >
+      <Text className="font-heading text-title text-ink mb-4">新規案件作成</Text>
       <Text className="font-body-medium text-body text-ink mb-2">モニター</Text>
       {selectedMonitor ? (
         <View className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-4 flex-row items-center justify-between">
@@ -1181,6 +1197,32 @@ export default function AdminCampaignForm() {
         loading={submitting}
       />
     </ScrollView>
+  );
+}
+
+// 単独ルートとしてアクセスされた場合のフォールバック。admin-campaign-listのシートに埋め込まれる場合は
+// AdminCampaignFormContentを直接使う。
+export default function AdminCampaignForm() {
+  const params = useLocalSearchParams<{
+    id?: string;
+    sourceOrderId?: string;
+    monitorId?: string;
+    monitorName?: string;
+    shipmentOrderNo?: string;
+    shippedAt?: string;
+    lineItems?: string;
+  }>();
+  return (
+    <HeroScreen title={params.id ? '案件編集' : '新規案件作成'} onBack={() => goBackOrReplace('/admin-campaign-list')}>
+      <AdminCampaignFormContent
+        id={params.id}
+        initialSourceOrderId={params.sourceOrderId}
+        initialMonitorId={params.monitorId}
+        initialMonitorName={params.monitorName}
+        initialShipmentOrderNo={params.shipmentOrderNo}
+        initialShippedAt={params.shippedAt}
+        initialLineItems={params.lineItems}
+      />
     </HeroScreen>
   );
 }

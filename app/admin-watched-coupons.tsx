@@ -15,8 +15,9 @@ type WatchedCoupon = {
   active: boolean;
 };
 
-// 監視対象クーポンの登録(仕様書 v1.8 3.12)。コード登録時にShopify APIで実在チェックを行う。
-export default function AdminWatchedCoupons() {
+// 監視対象クーポンの登録本体(仕様書 v1.8 3.12)。コード登録時にShopify APIで実在チェックを行う。
+// 単独ルートでもadmin-homeのシート内埋め込みでも使う共通コンポーネント。
+export function AdminWatchedCouponsContent() {
   const [coupons, setCoupons] = useState<WatchedCoupon[]>([]);
   const [code, setCode] = useState('');
   const [label, setLabel] = useState('');
@@ -78,8 +79,8 @@ export default function AdminWatchedCoupons() {
   }
 
   return (
-    <HeroScreen title="監視クーポン登録" onBack={() => goBackOrReplace('/admin-home')}>
     <View className="flex-1 px-6 pt-6">
+      <Text className="font-heading text-title text-ink mb-4">監視クーポン登録</Text>
       <TextField label="クーポンコード" value={code} onChangeText={setCode} autoCapitalize="characters" />
       <TextField label="ラベル(任意)" value={label} onChangeText={setLabel} />
 
@@ -113,6 +114,15 @@ export default function AdminWatchedCoupons() {
         )}
       />
     </View>
+  );
+}
+
+// 単独ルートとしてアクセスされた場合のフォールバック。admin-homeのシートに埋め込まれる場合は
+// AdminWatchedCouponsContentを直接使う。
+export default function AdminWatchedCoupons() {
+  return (
+    <HeroScreen title="監視クーポン登録" onBack={() => goBackOrReplace('/admin-home')}>
+      <AdminWatchedCouponsContent />
     </HeroScreen>
   );
 }

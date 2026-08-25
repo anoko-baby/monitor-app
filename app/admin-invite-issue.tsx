@@ -19,7 +19,8 @@ function generateInviteCode(): string {
   return code;
 }
 
-export default function AdminInviteIssue() {
+// モニター招待コード発行の本体。単独ルートでもadmin-homeのシート内埋め込みでも使う共通コンポーネント。
+export function AdminInviteIssueContent() {
   const [instagramHandle, setInstagramHandle] = useState('');
   const [issuedCode, setIssuedCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -63,42 +64,50 @@ export default function AdminInviteIssue() {
 
   if (issuedCode) {
     return (
-      <HeroScreen title="招待コードを発行しました" onBack={() => goBackOrReplace('/admin-monitor-list')}>
-        <View className="flex-1 px-6 pt-6 items-center">
-          <View className="bg-surface rounded-card border-hairline border-line px-8 py-6 mb-6">
-            <Text className="font-body text-title-lg text-ink" style={{ letterSpacing: 6 }}>
-              {issuedCode}
-            </Text>
-          </View>
-          <Text className="font-body text-caption text-ink-soft text-center">
-            このコードをLINE等でモニターに送付してください(有効期限{INVITE_EXPIRY_DAYS}日)
+      <View className="flex-1 px-6 pt-6 items-center">
+        <Text className="font-heading text-title text-ink mb-6">招待コードを発行しました</Text>
+        <View className="bg-surface rounded-card border-hairline border-line px-8 py-6 mb-6">
+          <Text className="font-body text-title-lg text-ink" style={{ letterSpacing: 6 }}>
+            {issuedCode}
           </Text>
         </View>
-      </HeroScreen>
+        <Text className="font-body text-caption text-ink-soft text-center">
+          このコードをLINE等でモニターに送付してください(有効期限{INVITE_EXPIRY_DAYS}日)
+        </Text>
+      </View>
     );
   }
 
   return (
+    <View className="flex-1 px-6 pt-6">
+      <Text className="font-heading text-title text-ink mb-4">モニターを招待する</Text>
+      <TextField
+        label="Instagramアカウント名"
+        value={instagramHandle}
+        onChangeText={setInstagramHandle}
+        autoCapitalize="none"
+        autoCorrect={false}
+        placeholder="anoko_monitor"
+      />
+
+      {error && <ErrorBanner message={error} />}
+
+      <AppButton
+        label={loading ? '発行中…' : '招待コードを発行する'}
+        onPress={handleIssue}
+        disabled={!instagramHandle.trim()}
+        loading={loading}
+      />
+    </View>
+  );
+}
+
+// 単独ルートとしてアクセスされた場合(admin-homeのメニューからの遷移等)のフォールバック。
+// admin-monitor-listのシートに埋め込まれる場合はAdminInviteIssueContentを直接使う。
+export default function AdminInviteIssue() {
+  return (
     <HeroScreen title="モニターを招待する" onBack={() => goBackOrReplace('/admin-monitor-list')}>
-      <View className="flex-1 px-6 pt-6">
-        <TextField
-          label="Instagramアカウント名"
-          value={instagramHandle}
-          onChangeText={setInstagramHandle}
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder="anoko_monitor"
-        />
-
-        {error && <ErrorBanner message={error} />}
-
-        <AppButton
-          label={loading ? '発行中…' : '招待コードを発行する'}
-          onPress={handleIssue}
-          disabled={!instagramHandle.trim()}
-          loading={loading}
-        />
-      </View>
+      <AdminInviteIssueContent />
     </HeroScreen>
   );
 }

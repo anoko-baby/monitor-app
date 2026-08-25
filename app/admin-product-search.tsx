@@ -24,8 +24,8 @@ type Product = {
   variants: Variant[];
 };
 
-// 案件登録画面(M5)からも呼び出す想定の商品検索。M4時点では検索結果の表示までを確認する。
-export default function AdminProductSearch() {
+// 商品検索の本体。単独ルートでもadmin-homeのシート内埋め込みでも使う共通コンポーネント。
+export function AdminProductSearchContent() {
   const [query, setQuery] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,8 +54,8 @@ export default function AdminProductSearch() {
   }
 
   return (
-    <HeroScreen title="商品検索" onBack={() => goBackOrReplace('/admin-home')}>
     <View className="flex-1 px-6 pt-6">
+      <Text className="font-heading text-title text-ink mb-4">商品検索</Text>
       <View className="flex-row items-end mb-2">
         <View className="flex-1 mr-2">
           <TextField label="商品検索" value={query} onChangeText={setQuery} placeholder="商品名など" />
@@ -104,6 +104,15 @@ export default function AdminProductSearch() {
         )}
       />
     </View>
+  );
+}
+
+// 単独ルートとしてアクセスされた場合のフォールバック。admin-homeのシートに埋め込まれる場合は
+// AdminProductSearchContentを直接使う。
+export default function AdminProductSearch() {
+  return (
+    <HeroScreen title="商品検索" onBack={() => goBackOrReplace('/admin-home')}>
+      <AdminProductSearchContent />
     </HeroScreen>
   );
 }

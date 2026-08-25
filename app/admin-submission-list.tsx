@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Image, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
@@ -11,6 +10,7 @@ import { formatCampaignNo } from '../lib/campaigns';
 import { getThumbnailSignedUrl } from '../lib/mediaPipeline';
 import { supabase } from '../lib/supabase';
 import { ADMIN_TAB_ITEMS } from '../lib/tabItems';
+import { AdminSubmissionDetailContent } from './admin-submission-detail';
 
 const PAGE_SIZE = 50;
 
@@ -66,8 +66,12 @@ function matchesStatusFilter(filter: StatusFilter, status: string | null, dueDat
   return status === filter;
 }
 
+type SheetView = { type: 'list' } | { type: 'detail'; taskId: string };
+
 // 全提出一覧(仕様書 v1.8 3.6.2)。回次単位の1行にデータ/SNS両タスクのステータスを並べて表示する。
+// 実機フィードバックにより、ヘッダー/フッタータブを固定したままシート本体だけ差し替える方式にした。
 export default function AdminSubmissionList() {
+  const [view, setView] = useState<SheetView>({ type: 'list' });
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -182,23 +186,37 @@ export default function AdminSubmissionList() {
 
   function openTask(taskId: string | null) {
     if (!taskId) return;
-    router.push({ pathname: '/admin-submission-detail', params: { taskId } });
+    setView({ type: 'detail', taskId });
+  }
+
+  function backToList() {
+    setView({ type: 'list' });
+    load();
   }
 
   return (
     <View className="flex-1">
       <HeroScreen
         title="全提出一覧"
-        subtitle={`${filtered.length}件`}
+        subtitle={view.type === 'list' ? `${filtered.length}件` : undefined}
         headerExtra={<HeroProfileBadge />}
-        tabs={[
-          { key: 'all', label: 'すべて', icon: 'list-outline', activeIcon: 'list' },
-          { key: 'media', label: 'データ', icon: 'image-outline', activeIcon: 'image' },
-          { key: 'sns', label: 'SNS', icon: 'at-outline', activeIcon: 'at' },
-        ]}
-        activeTab={taskTypeFilter}
-        onTabChange={(key) => setTaskTypeFilter(key as TaskTypeFilter)}
+        tabs={
+          view.type === 'list'
+            ? [
+                { key: 'all', label: 'すべて', icon: 'list-outline', activeIcon: 'list' },
+                { key: 'media', label: 'データ', icon: 'image-outline', activeIcon: 'image' },
+                { key: 'sns', label: 'SNS', icon: 'at-outline', activeIcon: 'at' },
+              ]
+            : undefined
+        }
+        activeTab={view.type === 'list' ? taskTypeFilter : undefined}
+        onTabChange={view.type === 'list' ? (key) => setTaskTypeFilter(key as TaskTypeFilter) : undefined}
+        onBack={view.type !== 'list' ? backToList : undefined}
       >
+      {view.type === 'detail' ? (
+        <AdminSubmissionDetailContent taskId={view.taskId} />
+      ) : (
+      <>
       <ScrollView
         className="px-6 pt-4"
         style={{ maxHeight: 280 }}
@@ -315,6 +333,8 @@ export default function AdminSubmissionList() {
           </View>
         )}
       />
+      </>
+      )}
       </HeroScreen>
 
       <BottomTabBar items={ADMIN_TAB_ITEMS} />

@@ -26,8 +26,10 @@ const STATUS_LABEL: Record<CouponOrder['status'], string> = {
   skipped: '対象外',
 };
 
-// クーポン注文タブ(仕様書 v1.8 3.12)。「案件化する」ボタンはM5(案件作成画面)で接続する。
-export default function AdminCouponOrders() {
+// クーポン注文タブの本体(仕様書 v1.8 3.12)。単独ルートでもadmin-homeのシート内埋め込みでも使う
+// 共通コンポーネント。「案件化する」は案件一覧セクション(admin-campaign-form)への遷移になるため、
+// このシート埋め込みの中でも通常のrouter.pushのまま(ヘッダーが変わるのは意図通り)。
+export function AdminCouponOrdersContent() {
   const [orders, setOrders] = useState<CouponOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -82,8 +84,8 @@ export default function AdminCouponOrders() {
   }
 
   return (
-    <HeroScreen title="クーポン注文" onBack={() => goBackOrReplace('/admin-home')}>
     <View className="flex-1 px-6 pt-6">
+      <Text className="font-heading text-title text-ink mb-4">クーポン注文</Text>
       {loadError && <ErrorBanner message={loadError} />}
       {loading && <Text className="font-body text-caption text-ink-soft">読み込み中…</Text>}
 
@@ -123,6 +125,15 @@ export default function AdminCouponOrders() {
         )}
       />
     </View>
+  );
+}
+
+// 単独ルートとしてアクセスされた場合のフォールバック。admin-homeのシートに埋め込まれる場合は
+// AdminCouponOrdersContentを直接使う。
+export default function AdminCouponOrders() {
+  return (
+    <HeroScreen title="クーポン注文" onBack={() => goBackOrReplace('/admin-home')}>
+      <AdminCouponOrdersContent />
     </HeroScreen>
   );
 }

@@ -54,10 +54,9 @@ const TASK_STATUS_LABEL: Record<string, string> = {
   cancelled: 'キャンセル',
 };
 
-// 提出詳細・検収(仕様書 v1.8 画面一覧6, 3.5)。taskIdはデータ/SNSどちらのタスクでも受け付ける。
-export default function AdminSubmissionDetail() {
-  const { taskId } = useLocalSearchParams<{ taskId: string }>();
-
+// 提出詳細・検収の本体(仕様書 v1.8 画面一覧6, 3.5)。taskIdはデータ/SNSどちらのタスクでも受け付ける。
+// 単独ルートでもadmin-submission-listのシート内埋め込みでも使う共通コンポーネント。
+export function AdminSubmissionDetailContent({ taskId }: { taskId: string }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -400,12 +399,11 @@ export default function AdminSubmissionDetail() {
   const canReview = taskStatus === 'submitted';
 
   return (
-    <HeroScreen
-      title={campaignTitle}
-      subtitle={`${formatCampaignNo(campaignNo)} ・ ${monitorName} ・ ${cycleLabel} ・ ${taskType === 'media' ? 'データ提出' : 'SNS投稿'}`}
-      onBack={() => goBackOrReplace('/admin-submission-list')}
-    >
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
+      <Text className="font-heading text-title text-ink mb-1">{campaignTitle}</Text>
+      <Text className="font-body text-caption text-ink-soft mb-4">
+        {formatCampaignNo(campaignNo)} ・ {monitorName} ・ {cycleLabel} ・ {taskType === 'media' ? 'データ提出' : 'SNS投稿'}
+      </Text>
       <Text className="font-body text-caption text-ink-soft mb-4">
         期限: {taskDueDate} ・ ステータス: {TASK_STATUS_LABEL[taskStatus]}
       </Text>
@@ -550,6 +548,16 @@ export default function AdminSubmissionDetail() {
         </View>
       </Modal>
     </ScrollView>
+  );
+}
+
+// 単独ルートとしてアクセスされた場合のフォールバック。admin-submission-listのシートに埋め込まれる
+// 場合はAdminSubmissionDetailContentを直接使う。
+export default function AdminSubmissionDetail() {
+  const { taskId } = useLocalSearchParams<{ taskId: string }>();
+  return (
+    <HeroScreen title="提出詳細" onBack={() => goBackOrReplace('/admin-submission-list')}>
+      <AdminSubmissionDetailContent taskId={taskId} />
     </HeroScreen>
   );
 }

@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 
@@ -10,6 +9,7 @@ import { HeroProfileBadge } from '../components/HeroProfileBadge';
 import { HeroScreen } from '../components/HeroScreen';
 import { supabase } from '../lib/supabase';
 import { ADMIN_TAB_ITEMS } from '../lib/tabItems';
+import { AdminAnnouncementFormContent } from './admin-announcement-form';
 
 type AnnouncementRow = {
   id: string;
@@ -18,8 +18,12 @@ type AnnouncementRow = {
   targetCount: number;
 };
 
+type SheetView = { type: 'list' } | { type: 'create' };
+
 // お知らせ配信の履歴一覧(仕様書 v1.8 3.9)。作成と同時に配信されるため、下書き状態は無い。
+// 実機フィードバックにより、ヘッダー/フッタータブを固定したままシート本体だけ差し替える方式にした。
 export default function AdminAnnouncementList() {
+  const [view, setView] = useState<SheetView>({ type: 'list' });
   const [rows, setRows] = useState<AnnouncementRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -58,12 +62,25 @@ export default function AdminAnnouncementList() {
     load();
   }, []);
 
+  function backToList() {
+    setView({ type: 'list' });
+    load();
+  }
+
   return (
     <View className="flex-1">
-      <HeroScreen title="お知らせ配信" subtitle={`配信済み ${rows.length}件`} headerExtra={<HeroProfileBadge />}>
+      <HeroScreen
+        title="お知らせ配信"
+        subtitle={view.type === 'list' ? `配信済み ${rows.length}件` : undefined}
+        headerExtra={<HeroProfileBadge />}
+        onBack={view.type !== 'list' ? backToList : undefined}
+      >
+      {view.type === 'create' ? (
+        <AdminAnnouncementFormContent onSaved={backToList} />
+      ) : (
       <View className="flex-1 px-6 pt-4">
       <View className="mb-4">
-        <AppButton label="お知らせを作成・配信する" onPress={() => router.push('/admin-announcement-form')} />
+        <AppButton label="お知らせを作成・配信する" onPress={() => setView({ type: 'create' })} />
       </View>
 
       {loadError && <ErrorBanner message={loadError} />}
@@ -95,6 +112,7 @@ export default function AdminAnnouncementList() {
         />
       )}
       </View>
+      )}
       </HeroScreen>
 
       <BottomTabBar items={ADMIN_TAB_ITEMS} />

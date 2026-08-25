@@ -11,9 +11,10 @@ import { supabase } from '../lib/supabase';
 
 type MonitorOption = { id: string; name: string | null; nickname: string | null };
 
-// お知らせ作成・配信(仕様書 v1.8 3.9)。Phase1は全モニター/個別選択のみ(タグ・グループ配信はPhase2)。
-// 送信前に対象人数・対象者一覧のプレビューを必ず表示する。
-export default function AdminAnnouncementForm() {
+// お知らせ作成・配信の本体(仕様書 v1.8 3.9)。Phase1は全モニター/個別選択のみ(タグ・グループ配信はPhase2)。
+// 送信前に対象人数・対象者一覧のプレビューを必ず表示する(プレビューへの切り替えはこのコンポーネント内で完結)。
+// 単独ルートでもadmin-announcement-listのシート内埋め込みでも使う共通コンポーネント。
+export function AdminAnnouncementFormContent({ onSaved }: { onSaved?: () => void }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [linkLabel, setLinkLabel] = useState('');
@@ -118,7 +119,8 @@ export default function AdminAnnouncementForm() {
         body: { event: 'announcement_sent', announcementId: announcement.id },
       });
 
-      router.replace('/admin-announcement-list');
+      if (onSaved) onSaved();
+      else router.replace('/admin-announcement-list');
     } catch (err: any) {
       setFormError(err?.message ?? '配信に失敗しました');
     } finally {
@@ -128,8 +130,8 @@ export default function AdminAnnouncementForm() {
 
   if (previewTargets) {
     return (
-      <HeroScreen title="配信内容の確認" onBack={() => setPreviewTargets(null)}>
       <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
+        <Text className="font-heading text-title text-ink mb-4">配信内容の確認</Text>
         <View className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-4">
           <Text className="font-body-medium text-body text-ink mb-1">{title}</Text>
           <Text className="font-body text-caption text-ink-soft">{body}</Text>
@@ -165,17 +167,16 @@ export default function AdminAnnouncementForm() {
           <AppButton label="戻って修正する" variant="secondary" onPress={() => setPreviewTargets(null)} />
         </View>
       </ScrollView>
-      </HeroScreen>
     );
   }
 
   return (
-    <HeroScreen title="お知らせ作成・配信" onBack={() => goBackOrReplace('/admin-announcement-list')}>
     <ScrollView
       className="flex-1"
       contentContainerStyle={{ padding: 24 }}
       keyboardShouldPersistTaps="handled"
     >
+      <Text className="font-heading text-title text-ink mb-4">お知らせ作成・配信</Text>
       <TextField label="タイトル" value={title} onChangeText={setTitle} />
       <TextField label="本文" value={body} onChangeText={setBody} multiline numberOfLines={5} />
       <TextField label="リンクボタンのラベル(任意)" value={linkLabel} onChangeText={setLinkLabel} />
@@ -280,6 +281,15 @@ export default function AdminAnnouncementForm() {
         <AppButton label={previewLoading ? '確認中…' : '配信内容を確認する'} onPress={handlePreview} loading={previewLoading} />
       </View>
     </ScrollView>
+  );
+}
+
+// 単独ルートとしてアクセスされた場合のフォールバック。admin-announcement-listのシートに埋め込まれる
+// 場合はAdminAnnouncementFormContentを直接使う。
+export default function AdminAnnouncementForm() {
+  return (
+    <HeroScreen title="お知らせ作成・配信" onBack={() => goBackOrReplace('/admin-announcement-list')}>
+      <AdminAnnouncementFormContent />
     </HeroScreen>
   );
 }
