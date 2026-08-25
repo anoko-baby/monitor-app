@@ -58,7 +58,9 @@ function encodeDropboxApiArg(apiArg: unknown): string {
   });
 }
 
-async function getDropboxAccessToken(): Promise<string> {
+type DropboxAuth = { accessToken: string; rootNamespaceId: string | null };
+
+async function getDropboxAccessToken(): Promise<DropboxAuth> {
   const { data, error } = await supabase.functions.invoke('dropbox-token');
   if (error) {
     throw new Error(`Dropboxトークンの取得に失敗しました: ${error.message}`);
@@ -66,7 +68,16 @@ async function getDropboxAccessToken(): Promise<string> {
   if (!data?.accessToken) {
     throw new Error(`Dropboxトークンの取得に失敗しました: ${JSON.stringify(data)}`);
   }
-  return data.accessToken as string;
+  return { accessToken: data.accessToken as string, rootNamespaceId: data.rootNamespaceId ?? null };
+}
+
+// 「モニターデータ」のようなチーム共有フォルダを保存先にする場合、Dropbox-API-Path-Rootヘッダーで
+// 名前空間を明示的に指定する必要がある(supabase/functions/_shared/dropbox.tsの同名処理と対応)。
+function pathRootHeader(rootNamespaceId: string | null): Record<string, string> {
+  if (!rootNamespaceId) return {};
+  return {
+    'Dropbox-API-Path-Root': JSON.stringify({ '.tag': 'namespace_id', namespace_id: rootNamespaceId }),
+  };
 }
 
 async function loadSession(key: string): Promise<UploadSessionState | null> {
@@ -108,6 +119,7 @@ async function writeChunkToTempFile(
 async function callDropboxContentFromFile(
   endpoint: 'upload_session/start' | 'upload_session/append_v2' | 'upload_session/finish',
   accessToken: string,
+  rootNamespaceId: string | null,
   apiArg: unknown,
   chunkFileUri: string
 ): Promise<any> {
@@ -121,6 +133,7 @@ async function callDropboxContentFromFile(
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/octet-stream',
         'Dropbox-API-Arg': encodeDropboxApiArg(apiArg),
+        ...pathRootHeader(rootNamespaceId),
       },
     }
   );
@@ -135,6 +148,7 @@ async function callDropboxContentFromFile(
 async function callDropboxContentFromBlob(
   endpoint: 'upload_session/start' | 'upload_session/append_v2' | 'upload_session/finish',
   accessToken: string,
+  rootNamespaceId: string | null,
   apiArg: unknown,
   chunkBlob: Blob
 ): Promise<any> {
@@ -144,6 +158,7 @@ async function callDropboxContentFromBlob(
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/octet-stream',
       'Dropbox-API-Arg': encodeDropboxApiArg(apiArg),
+      ...pathRootHeader(rootNamespaceId),
     },
     body: chunkBlob,
   });
@@ -200,7 +215,7 @@ export async function uploadFileToDropboxChunked({
     throw new Error('ファイルサイズを取得できませんでした');
   }
 
-  const accessToken = await getDropboxAccessToken();
+  const { accessToken, rootNamespaceId } = await getDropboxAccessToken();
 
   let session: UploadSessionState | null = await loadSession(resumeKey);
 
@@ -211,11 +226,17 @@ export async function uploadFileToDropboxChunked({
     length: number
   ): Promise<any> {
     if (isWeb) {
-      return callDropboxContentFromBlob(endpoint, accessToken, apiArg, webBlob!.slice(position, position + length));
+      return callDropboxContentFromBlob(
+        endpoint,
+        accessToken,
+        rootNamespaceId,
+        apiArg,
+        webBlob!.slice(position, position + length)
+      );
     }
     const chunkUri = await writeChunkToTempFile(fileUri, position, length);
     try {
-      return await callDropboxContentFromFile(endpoint, accessToken, apiArg, chunkUri);
+      return await callDropboxContentFromFile(endpoint, accessToken, rootNamespaceId, apiArg, chunkUri);
     } finally {
       await FileSystem.deleteAsync(chunkUri, { idempotent: true });
     }
@@ -285,7 +306,7 @@ export async function uploadFileToDropboxChunked({
 }
 
 export async function createDropboxSharedLink(path: string): Promise<string> {
-  const accessToken = await getDropboxAccessToken();
+  const { accessToken, rootNamespaceId } = await getDropboxAccessToken();
 
   const response = await fetch(
     'https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings',
@@ -294,6 +315,7 @@ export async function createDropboxSharedLink(path: string): Promise<string> {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
+        ...pathRootHeader(rootNamespaceId),
       },
       body: JSON.stringify({ path }),
     }
@@ -311,6 +333,7 @@ export async function createDropboxSharedLink(path: string): Promise<string> {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
+        ...pathRootHeader(rootNamespaceId),
       },
       body: JSON.stringify({ path, direct_only: true }),
     });

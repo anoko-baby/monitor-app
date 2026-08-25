@@ -476,6 +476,24 @@ Dropboxアップロードのチャンク処理バグ修正後も、一部のPNG�
 
 ---
 
+## Dropbox連携先を「App folder」から「Full Dropbox + 専用チームフォルダ」に変更(2026-08-25)
+
+「大元のフォルダを変えたい。アプリの中に入り込んでくるのはわかりにくい」との要望を受けて対応。
+
+**背景**: 従来は「App folder」方式のDropboxアプリを使っており、API経由で作られるフォルダは常にそのアプリ専用フォルダ(`アプリ/anoko. monitor app/`配下)の中にしか作れない仕様だった。Azusaさんの目には見えにくい場所になっていた。
+
+**対応**:
+- Azusaさんに新しいDropboxアプリ(Full Dropbox権限)を作成 → 認証してrefresh tokenを取得 → `DROPBOX_APP_KEY`/`DROPBOX_APP_SECRET`/`DROPBOX_REFRESH_TOKEN`をSupabase Secretsに設定し直していただいた(値はチャットに貼らせず、ご本人のターミナルから`npx supabase secrets set`で実行)
+- 「anoko.」がDropbox Businessのチームアカウントであることが判明。Full Dropbox権限でも既定では自分のホーム名前空間が起点になり、Azusaさんが新しく作成したチーム共有フォルダ「モニターデータ」(Team Space直下、`azusa ( anoko. )`と同列)は別の名前空間として扱われる仕様だった
+- Dropbox APIの`Dropbox-API-Path-Root`ヘッダー(`{".tag": "namespace_id", "namespace_id": "..."}`)で名前空間を明示的に指定する方式に対応。`supabase/functions/_shared/dropbox.ts`に`getDropboxRootNamespaceId()`(`DROPBOX_ROOT_NAMESPACE_ID`環境変数を読む)を追加し、`createDropboxFolder`にこのヘッダーを付与するオプションを追加
+- `dropbox-token` Edge Functionのレスポンスに`rootNamespaceId`を追加し、クライアント(`lib/dropbox.ts`)もアップロード・共有リンク作成の全fetch呼び出しに同ヘッダーを付与するよう変更
+- `dropbox-create-campaign-folders`: `DROPBOX_ROOT_NAMESPACE_ID`が設定されている場合、案件フォルダは名前空間のルート直下(=「モニターデータ」フォルダ直下)に作成するよう変更し、従来の`/anoko_monitor`プレフィックスを省略(「モニターデータ」フォルダ自体がアプリ専用フォルダとして機能するため、その中で二重に`anoko_monitor`フォルダを作る必要が無い)。未設定時は従来どおりのプレフィックス付きパスにフォールバックする後方互換動作
+- migration `20260825000006_fix_dropbox_base_path_prefix.sql`: 切り替え前に作成された既存案件の`dropbox_base_path`から旧`/anoko_monitor`プレフィックスを除去(新しい名前空間ルート基準のパスに揃える)。**要 `npx supabase db push`**
+- 「モニターデータ」フォルダの`shared_folder_id`(= namespace_id)は`14991756083`。**Azusaさんに`npx supabase secrets set DROPBOX_ROOT_NAMESPACE_ID="14991756083"`の実行をお願いする必要あり(未実施)**
+- `npx tsc --noEmit`・`npx expo export -p web`とも通過を確認済み
+
+---
+
 ## 未確定・要確認事項の記録
 
 - Dropbox Scoped App / Supabaseプロジェクトは未作成(2026-07-09時点)。M1着手前に準備が必要

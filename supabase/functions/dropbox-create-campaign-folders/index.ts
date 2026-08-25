@@ -1,8 +1,14 @@
 // 案件登録時にDropboxへ規定のフォルダ構造を作成する(仕様書 v1.8 6.1)。
-// /anoko_monitor/{ブランド名}/{商品名}_{SKU}/{案件番号}_{モニター名}/第{n}回_{提出期限YYYYMMDD}/
+// DROPBOX_ROOT_NAMESPACE_ID設定時(「モニターデータ」名前空間直下): /{ブランド名}/{商品名}_{SKU}/{案件番号}_{モニター名}/第{n}回_{提出期限YYYYMMDD}/
+// 未設定時(従来のApp folder/ホーム名前空間運用): /anoko_monitor/{ブランド名}/{商品名}_{SKU}/{案件番号}_{モニター名}/第{n}回_{提出期限YYYYMMDD}/
 // DB読み書きは呼び出し元(admin/staff)のJWTをそのまま転送し、RLSに従う(service roleは使わない)。
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { createDropboxFolder, getDropboxAccessToken, sanitizeDropboxPathSegment } from '../_shared/dropbox.ts';
+import {
+  createDropboxFolder,
+  getDropboxAccessToken,
+  getDropboxRootNamespaceId,
+  sanitizeDropboxPathSegment,
+} from '../_shared/dropbox.ts';
 import { monitorDisplayName } from '../_shared/profiles.ts';
 
 const corsHeaders = {
@@ -123,7 +129,13 @@ Deno.serve(async (req: Request) => {
     `${formatCampaignNo(campaign.campaign_no)}_${monitorDisplayName(monitor)}`
   );
 
-  const basePath = `/anoko_monitor/${brandSegment}/${productSegment}/${monitorSegment}`;
+  // DROPBOX_ROOT_NAMESPACE_ID未設定時(従来のApp folder/ホーム名前空間運用)との後方互換のため、
+  // 名前空間を明示的に切り替える場合のみ/anoko_monitorのプレフィックスを省略する(「モニターデータ」
+  // 名前空間自体がこのアプリ専用フォルダとして機能するため、その中で二重にフォルダを作る必要が無い)。
+  const rootNamespaceId = getDropboxRootNamespaceId();
+  const basePath = rootNamespaceId
+    ? `/${brandSegment}/${productSegment}/${monitorSegment}`
+    : `/anoko_monitor/${brandSegment}/${productSegment}/${monitorSegment}`;
 
   const tokenResult = await getDropboxAccessToken();
   if ('error' in tokenResult) {
@@ -131,7 +143,7 @@ Deno.serve(async (req: Request) => {
   }
   const { accessToken } = tokenResult;
 
-  const baseResult = await createDropboxFolder(accessToken, basePath);
+  const baseResult = await createDropboxFolder(accessToken, basePath, rootNamespaceId);
   if (!baseResult.ok) {
     return jsonResponse({ error: `Dropboxフォルダ作成に失敗しました: ${baseResult.error}` }, 502);
   }
@@ -142,7 +154,7 @@ Deno.serve(async (req: Request) => {
     const cycleSegment = sanitizeDropboxPathSegment(
       `第${cycle.cycle_no}回_${formatDateYYYYMMDD(dueDate)}`
     );
-    const cycleResult = await createDropboxFolder(accessToken, `${basePath}/${cycleSegment}`);
+    const cycleResult = await createDropboxFolder(accessToken, `${basePath}/${cycleSegment}`, rootNamespaceId);
     if (!cycleResult.ok) {
       return jsonResponse(
         { error: `回次フォルダ作成に失敗しました(第${cycle.cycle_no}回): ${cycleResult.error}` },
