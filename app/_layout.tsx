@@ -7,6 +7,8 @@ import { Stack } from 'expo-router';
 import { Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { makeHeaderBackButton } from '../components/HeaderBackButton';
+
 // Web版: スマホ幅前提のレイアウトがワイドな画面で間延びして見づらいため、
 // 中央に最大幅のカラムを敷いてその外側をline色でレターボックス表示する
 // (ネイティブでは無関係。Platform.OS==='web'のときのみ効く)。
@@ -54,26 +56,62 @@ export default function RootLayout() {
             <Stack.Screen name="register" options={{ title: 'メール登録' }} />
             <Stack.Screen name="consent" options={{ title: '利用同意', headerBackVisible: false }} />
             <Stack.Screen name="monitor-home" options={{ headerShown: false }} />
-            <Stack.Screen name="campaign-detail" options={{ title: '案件詳細' }} />
-            <Stack.Screen name="submission-form" options={{ title: '提出する' }} />
-            <Stack.Screen name="sns-submission-form" options={{ title: 'SNS投稿記録' }} />
-            <Stack.Screen name="submission-history" options={{ title: '提出履歴' }} />
-            <Stack.Screen name="announcements" options={{ title: 'お知らせ' }} />
-            <Stack.Screen name="announcement-detail" options={{ title: 'お知らせ詳細' }} />
+            <Stack.Screen
+              name="campaign-detail"
+              options={{ title: '案件詳細', headerLeft: makeHeaderBackButton('/monitor-home') }}
+            />
+            <Stack.Screen
+              name="submission-form"
+              options={{ title: '提出する', headerLeft: makeHeaderBackButton('/monitor-home') }}
+            />
+            <Stack.Screen
+              name="sns-submission-form"
+              options={{ title: 'SNS投稿記録', headerLeft: makeHeaderBackButton('/monitor-home') }}
+            />
+            <Stack.Screen name="submission-history" options={{ headerShown: false }} />
+            <Stack.Screen name="announcements" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="announcement-detail"
+              options={{ title: 'お知らせ詳細', headerLeft: makeHeaderBackButton('/announcements') }}
+            />
             <Stack.Screen name="admin-home" options={{ headerShown: false }} />
-            <Stack.Screen name="admin-invite-issue" options={{ title: 'モニターを招待する' }} />
-            <Stack.Screen name="admin-monitor-list" options={{ title: 'モニター一覧' }} />
-            <Stack.Screen name="admin-monitor-detail" options={{ title: 'モニター詳細' }} />
-            <Stack.Screen name="monitor-profile" options={{ title: 'プロフィール' }} />
-            <Stack.Screen name="admin-product-search" options={{ title: '商品検索' }} />
-            <Stack.Screen name="admin-watched-coupons" options={{ title: '監視クーポン登録' }} />
-            <Stack.Screen name="admin-coupon-orders" options={{ title: 'クーポン注文' }} />
-            <Stack.Screen name="admin-campaign-list" options={{ title: '案件一覧' }} />
-            <Stack.Screen name="admin-campaign-form" options={{ title: '案件作成・編集' }} />
-            <Stack.Screen name="admin-submission-list" options={{ title: '全提出一覧' }} />
-            <Stack.Screen name="admin-submission-detail" options={{ title: '提出詳細・検収' }} />
-            <Stack.Screen name="admin-announcement-list" options={{ title: 'お知らせ配信' }} />
-            <Stack.Screen name="admin-announcement-form" options={{ title: 'お知らせ作成・配信' }} />
+            <Stack.Screen
+              name="admin-invite-issue"
+              options={{ title: 'モニターを招待する', headerLeft: makeHeaderBackButton('/admin-monitor-list') }}
+            />
+            <Stack.Screen name="admin-monitor-list" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="admin-monitor-detail"
+              options={{ title: 'モニター詳細', headerLeft: makeHeaderBackButton('/admin-monitor-list') }}
+            />
+            <Stack.Screen name="monitor-profile" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="admin-product-search"
+              options={{ title: '商品検索', headerLeft: makeHeaderBackButton('/admin-home') }}
+            />
+            <Stack.Screen
+              name="admin-watched-coupons"
+              options={{ title: '監視クーポン登録', headerLeft: makeHeaderBackButton('/admin-home') }}
+            />
+            <Stack.Screen
+              name="admin-coupon-orders"
+              options={{ title: 'クーポン注文', headerLeft: makeHeaderBackButton('/admin-home') }}
+            />
+            <Stack.Screen name="admin-campaign-list" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="admin-campaign-form"
+              options={{ title: '案件作成・編集', headerLeft: makeHeaderBackButton('/admin-campaign-list') }}
+            />
+            <Stack.Screen name="admin-submission-list" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="admin-submission-detail"
+              options={{ title: '提出詳細・検収', headerLeft: makeHeaderBackButton('/admin-submission-list') }}
+            />
+            <Stack.Screen name="admin-announcement-list" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="admin-announcement-form"
+              options={{ title: 'お知らせ作成・配信', headerLeft: makeHeaderBackButton('/admin-announcement-list') }}
+            />
             <Stack.Screen name="dev-upload-test" options={{ title: 'Dropboxアップロード検証(開発用)' }} />
           </Stack>
         </View>

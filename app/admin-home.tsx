@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { BottomTabBar } from '../components/BottomTabBar';
 import { Screen } from '../components/Screen';
+import { ADMIN_TAB_ITEMS } from '../lib/tabItems';
 import { supabase } from '../lib/supabase';
 
 const LINKS: {
@@ -43,25 +44,7 @@ export default function AdminHome() {
         ))}
       </ScrollView>
 
-      <BottomTabBar
-        items={[
-          { label: 'ホーム', href: '/admin-home', icon: 'home-outline', activeIcon: 'home' },
-          { label: '案件一覧', href: '/admin-campaign-list', icon: 'briefcase-outline', activeIcon: 'briefcase' },
-          {
-            label: '提出一覧',
-            href: '/admin-submission-list',
-            icon: 'document-text-outline',
-            activeIcon: 'document-text',
-          },
-          { label: 'モニター', href: '/admin-monitor-list', icon: 'people-outline', activeIcon: 'people' },
-          {
-            label: 'お知らせ',
-            href: '/admin-announcement-list',
-            icon: 'megaphone-outline',
-            activeIcon: 'megaphone',
-          },
-        ]}
-      />
+      <BottomTabBar items={ADMIN_TAB_ITEMS} />
     </Screen>
   );
 }

@@ -3,6 +3,7 @@
 // x-cron-secret付きで呼ばれる想定。CRON_SECRETはEdge Function Secretsに設定しておくこと。
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { alreadySentToday, getStaffAdminProfileIds, sendPushToProfile, sendPushToProfiles } from '../_shared/push.ts';
+import { monitorDisplayName } from '../_shared/profiles.ts';
 
 function addDaysToISODate(isoDate: string, days: number): string {
   const d = new Date(`${isoDate}T00:00:00Z`);
@@ -82,8 +83,8 @@ Deno.serve(async (req: Request) => {
       if (campaign.status !== 'active') continue;
       if (await alreadySentToday(admin, t.id, 'n6_overdue_monitor')) continue;
 
-      const { data: monitor } = await admin.from('profiles').select('name').eq('id', campaign.monitor_id).maybeSingle();
-      const vars = { campaign_title: campaign.title, cycle_label: t.cycles.label, due_date: t.due_date, monitor_name: monitor?.name ?? '' };
+      const { data: monitor } = await admin.from('profiles').select('name, instagram_handle').eq('id', campaign.monitor_id).maybeSingle();
+      const vars = { campaign_title: campaign.title, cycle_label: t.cycles.label, due_date: t.due_date, monitor_name: monitorDisplayName(monitor) };
 
       await sendPushToProfile(admin, { profileId: campaign.monitor_id, templateKey: 'n6_overdue_monitor', vars, taskId: t.id });
       await sendPushToProfiles(admin, staffAdminIds, { templateKey: 'n7_overdue_staff', vars, taskId: t.id });
@@ -107,7 +108,7 @@ Deno.serve(async (req: Request) => {
       const alreadyLogged = await alreadySentTodayForCampaign(admin, c.id, 'n10_delivery_reminder_monitor');
       if (alreadyLogged) continue;
 
-      const { data: monitor } = await admin.from('profiles').select('name').eq('id', c.monitor_id).maybeSingle();
+      const { data: monitor } = await admin.from('profiles').select('name, instagram_handle').eq('id', c.monitor_id).maybeSingle();
       await sendPushToProfile(admin, {
         profileId: c.monitor_id,
         templateKey: 'n10_delivery_reminder_monitor',
@@ -115,7 +116,7 @@ Deno.serve(async (req: Request) => {
       });
       await sendPushToProfiles(admin, staffAdminIds, {
         templateKey: 'n10_delivery_reminder_staff',
-        vars: { campaign_title: c.title, monitor_name: monitor?.name ?? '' },
+        vars: { campaign_title: c.title, monitor_name: monitorDisplayName(monitor) },
       });
       sentCount++;
     }

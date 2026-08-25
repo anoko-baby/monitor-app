@@ -2,10 +2,14 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
+import { BottomTabBar } from '../components/BottomTabBar';
 import { CycleDots } from '../components/CycleDots';
+import { ErrorBanner } from '../components/ErrorBanner';
+import { Screen } from '../components/Screen';
 import { StatusPill } from '../components/StatusPill';
-import { CycleDotStatus, deriveCycleStatus, formatCampaignNo } from '../lib/campaigns';
+import { CycleDotStatus, deriveCycleStatus, formatCampaignNo, monitorDisplayName } from '../lib/campaigns';
 import { supabase } from '../lib/supabase';
+import { ADMIN_TAB_ITEMS } from '../lib/tabItems';
 
 type CampaignRow = {
   id: string;
@@ -26,15 +30,18 @@ const STATUS_LABEL: Record<CampaignRow['status'], string> = {
 export default function AdminCampaignList() {
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
+    setLoadError(null);
 
-    const { data: campaignsData } = await supabase
+    const { data: campaignsData, error } = await supabase
       .from('campaigns')
-      .select('id, campaign_no, title, status, monitor:profiles(name)')
+      .select('id, campaign_no, title, status, monitor:profiles(name, instagram_handle)')
       .is('deleted_at', null)
       .order('created_at', { ascending: false });
+    if (error) setLoadError(`案件一覧の取得に失敗しました: ${error.message}`);
 
     const campaignIds = (campaignsData ?? []).map((c) => c.id);
 
@@ -60,7 +67,10 @@ export default function AdminCampaignList() {
         campaignNo: c.campaign_no,
         title: c.title,
         status: c.status,
-        monitorName: c.monitor?.name ?? null,
+        monitorName: monitorDisplayName({
+          name: c.monitor?.name ?? null,
+          instagramHandle: c.monitor?.instagram_handle ?? null,
+        }),
         cycleStatuses: cyclesByCampaign.get(c.id) ?? [],
       }))
     );
@@ -72,7 +82,8 @@ export default function AdminCampaignList() {
   }, []);
 
   return (
-    <View className="flex-1 bg-bg px-6 pt-6">
+    <Screen>
+      <View className="flex-1 px-6 pt-6">
       <View className="flex-row items-center justify-between mb-4">
         <Text className="font-heading text-title-lg text-ink">案件一覧</Text>
         <Pressable onPress={() => router.push('/admin-campaign-form')}>
@@ -80,9 +91,11 @@ export default function AdminCampaignList() {
         </Pressable>
       </View>
 
+      {loadError && <ErrorBanner message={loadError} />}
       {loading && <Text className="font-body text-caption text-ink-soft">読み込み中…</Text>}
 
       <FlatList
+        style={{ flex: 1 }}
         data={campaigns}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
@@ -114,6 +127,9 @@ export default function AdminCampaignList() {
           </Pressable>
         )}
       />
-    </View>
+      </View>
+
+      <BottomTabBar items={ADMIN_TAB_ITEMS} />
+    </Screen>
   );
 }

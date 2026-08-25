@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { FlatList, Image, Text, View } from 'react-native';
 
+import { BottomTabBar } from '../components/BottomTabBar';
+import { ErrorBanner } from '../components/ErrorBanner';
+import { Screen } from '../components/Screen';
 import { getThumbnailSignedUrl } from '../lib/mediaPipeline';
 import { supabase } from '../lib/supabase';
+import { monitorTabItems } from '../lib/tabItems';
 
 type HistoryRow = {
   taskId: string;
@@ -32,15 +36,19 @@ function formatDate(dateStr: string | null): string {
 export default function SubmissionHistory() {
   const [rows, setRows] = useState<HistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [unreadAnnouncements, setUnreadAnnouncements] = useState(0);
 
   async function load() {
     setLoading(true);
+    setLoadError(null);
 
-    const { data: tasks } = await supabase
+    const { data: tasks, error } = await supabase
       .from('tasks')
       .select('id, type, status, due_date, submitted_at, cycle_id')
       .neq('status', 'pending')
       .order('submitted_at', { ascending: false });
+    if (error) setLoadError(`提出履歴の取得に失敗しました: ${error.message}`);
 
     const cycleIds = Array.from(new Set((tasks ?? []).map((t) => t.cycle_id)));
     const { data: cycles } = cycleIds.length
@@ -97,13 +105,26 @@ export default function SubmissionHistory() {
     setLoading(false);
   }
 
+  async function loadUnreadAnnouncements() {
+    const { count } = await supabase
+      .from('announcement_targets')
+      .select('id', { count: 'exact', head: true })
+      .is('read_at', null);
+    setUnreadAnnouncements(count ?? 0);
+  }
+
   useEffect(() => {
     load();
+    loadUnreadAnnouncements();
   }, []);
 
   return (
-    <View className="flex-1 bg-bg px-6 pt-6">
+    <Screen>
+      <View className="flex-1 px-6 pt-6">
+      <Text className="font-heading text-title-lg text-ink mb-4">提出履歴</Text>
+      {loadError && <ErrorBanner message={loadError} />}
       <FlatList
+        style={{ flex: 1 }}
         data={rows}
         keyExtractor={(item) => item.taskId}
         ListEmptyComponent={
@@ -139,6 +160,9 @@ export default function SubmissionHistory() {
           </View>
         )}
       />
-    </View>
+      </View>
+
+      <BottomTabBar items={monitorTabItems(unreadAnnouncements)} />
+    </Screen>
   );
 }

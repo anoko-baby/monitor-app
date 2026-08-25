@@ -5,6 +5,7 @@
 // 宛先であるstaff/adminのpush_tokenを読む必要があり、これはモニターのRLSでは読めないため)。
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { getStaffAdminProfileIds, sendPushToProfile, sendPushToProfiles } from '../_shared/push.ts';
+import { monitorDisplayName } from '../_shared/profiles.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -134,11 +135,11 @@ Deno.serve(async (req: Request) => {
     // 本人(提出したモニター)のみ呼び出せる。他人の提出を騙って通知を飛ばせないようにする。
     if (caller.id !== campaign.monitor_id) return jsonResponse({ error: 'forbidden' }, 403);
 
-    const { data: monitor } = await admin.from('profiles').select('name').eq('id', campaign.monitor_id).maybeSingle();
+    const { data: monitor } = await admin.from('profiles').select('name, instagram_handle').eq('id', campaign.monitor_id).maybeSingle();
     const staffAdminIds = await getStaffAdminProfileIds(admin);
     await sendPushToProfiles(admin, staffAdminIds, {
       templateKey: 'n5_task_submitted',
-      vars: { monitor_name: monitor?.name ?? '', campaign_title: campaign.title, cycle_label: cycle.label },
+      vars: { monitor_name: monitorDisplayName(monitor), campaign_title: campaign.title, cycle_label: cycle.label },
       taskId: task.id,
     });
     return jsonResponse({ ok: true });

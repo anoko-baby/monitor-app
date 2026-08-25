@@ -292,6 +292,53 @@ TestFlight配信の本稼働までまだ時間がかかるため、モニター�
 
 ---
 
+## 導線・データ連携の総点検(2026-08-25、「不完全な個所が多すぎる」フィードバックへの対応)
+
+**タブバー・戻る導線の修正**
+- フッタータブメニューが「各メニューを選択すると消える」問題を修正。管理者/モニター双方の一覧系画面(`admin-campaign-list`/`admin-submission-list`/`admin-monitor-list`/`admin-announcement-list`、モニター側`submission-history`/`announcements`/`monitor-profile`)を`Screen`+`BottomTabBar`構成に統一し、`app/_layout.tsx`側もこれらの画面を`headerShown: false`に変更(ネイティブヘッダーとタブバーが二重表示されていた問題も解消)
+- 詳細・フォーム系の全画面(`campaign-detail`/`submission-form`/`sns-submission-form`/`announcement-detail`/`admin-monitor-detail`/`admin-campaign-form`/`admin-submission-detail`/`admin-announcement-form`/`admin-invite-issue`/`admin-product-search`/`admin-watched-coupons`/`admin-coupon-orders`)に、確実に戻れる戻るボタンを追加。`components/HeaderBackButton.tsx`の`makeHeaderBackButton(fallbackHref)`を使い、`router.canGoBack()`が真なら通常の戻る、偽なら(Web版でリロードした場合など履歴が無いケース)決まった親画面へ`replace`する方式に統一。各画面の戻り先は実際の遷移元(例: `admin-invite-issue`→`admin-monitor-list`、`admin-campaign-form`→`admin-campaign-list`)に合わせて設定した
+
+**データ接続不具合(モニター一覧が空/紐づけた案件が見えない)の調査結果**
+- コード側(クエリ・RLSポリシー)を再確認したが、`admin-monitor-list.tsx`・`monitor-home.tsx`のクエリ、および`current_profile_id()`/`campaigns`のRLSポリシー(`monitor_id = current_profile_id()`)自体にはロジック上の不具合は見つからなかった。`invite-register`もモニター本登録時に新しいprofile行を作らず、招待時に作成済みのprofile行を`update`する実装になっており、招待→本登録でモニターのprofile.idがズレる作りにもなっていない
+- 最有力の原因は**migration `20260825000002`(`instagram_handle`/`prefecture`/`phone`列追加)が未適用**であること。このmigrationを当てないまま`admin-monitor-list.tsx`が`instagram_handle`列を含むクエリを実行するとエラーになり、旧コードでは`data ?? []`でエラーを握りつぶして「0件」に見えていた(この握りつぶしパターン自体は今回の一覧系画面すべてで`error`を捕捉し`ErrorBanner`に表示するよう修正済みなので、次回以降は実際に何が失敗しているかエラーメッセージが画面に出るようになった)
+- 案件が紐づいたはずなのにモニター側に表示されない件は、コード上の不具合を特定できなかったため、Azusaさんの実データを直接見て原因切り分けが必要。下記の診断SQLをSupabaseのSQL Editorで実行し、結果を貼っていただければ次のセッションで特定する
+  ```sql
+  -- 1. migration 20260825000002 が当たっているか(instagram_handle列の存在確認)
+  select column_name from information_schema.columns
+  where table_name = 'profiles' and column_name in ('instagram_handle', 'prefecture', 'phone');
+
+  -- 2. モニター一覧(admin-monitor-listと同じ条件)
+  select id, name, nickname, instagram_handle, status, auth_user_id, created_at
+  from profiles where role = 'monitor' order by created_at desc;
+
+  -- 3. 対象の案件がどのmonitor_idに紐づいているか
+  select id, campaign_no, title, monitor_id, status, deleted_at
+  from campaigns order by created_at desc limit 20;
+
+  -- 4. そのモニターがログインした際に current_profile_id() が返すはずのid
+  --   (対象モニターのメールアドレスに置き換えて実行)
+  select p.id as profile_id, p.name, p.instagram_handle, p.auth_user_id, u.email
+  from profiles p join auth.users u on u.id = p.auth_user_id
+  where u.email = 'ここにモニターのログイン用メールアドレスを入れる';
+
+  -- 5. 上記3のmonitor_idと4のprofile_idが一致しているかを目視確認。
+  --    一致していない場合、案件作成時に別のprofile行(同名の重複招待など)を選んでしまっている可能性が高い
+  ```
+- あわせて、招待時のInstagramアカウント名や氏名が重複している場合、同一人物のprofile行が複数できてしまっていないかも上記2の結果で確認してください(重複があれば案件の紐付け先を統一する必要があります)
+
+**Dropbox連携の再点検で見つかった不具合の修正**
+- `supabase/functions/dropbox-create-campaign-folders/index.ts`が案件作成時にDropboxフォルダ名(`{案件番号}_{モニター名}`)を組み立てる際、`profiles.name`のみを参照していた。今回の招待フロー変更(招待時は`name`がnullでInstagramアカウント名のみ)によって、**本登録前のモニターの案件はすべて「モニター名未設定」というフォルダ名で作成されてしまう状態**になっていた。`name`が無ければ`instagram_handle`にフォールバックするよう修正(`supabase/functions/_shared/profiles.ts`の`monitorDisplayName`を新設し、同じロジックをアプリ側`lib/campaigns.ts`とも共有)
+- 同じ理由で、日次通知バッチ(`notify-cron`)・即時通知(`notify-dispatch`)がstaff/admin向け通知文言に組み込む`monitor_name`も同様に空文字になり得ていたため、あわせて修正
+- 上記以外(トークン更新・チャンクアップロード・共有リンク作成のロジック自体)には不具合は見つからなかった。**「連携できていない気がする」の具体的な症状(アップロードが失敗する/フォルダが作られない/リンクが開けない等)を教えていただければ、次のセッションでより的を絞った調査ができる**。特にDropbox側の`DROPBOX_APP_KEY`/`DROPBOX_APP_SECRET`/`DROPBOX_REFRESH_TOKEN`がSupabase Edge Function Secretsに正しく設定されているかは、このセッションからは確認できないため、`npx supabase functions deploy dropbox-create-campaign-folders dropbox-token`を再実行しつつAzusaさんの環境で実際に案件を1件作成してみて、Dropbox側にフォルダができるか確認をお願いしたい
+
+**このセッションでの残タスク(Azusaさんの環境で実施が必要)**
+1. `npx supabase db push`(migration `20260825000002`の適用。まだの場合、モニター一覧のクエリがエラーになり続ける)
+2. `npx supabase functions deploy invite-register dropbox-create-campaign-folders notify-cron notify-dispatch`(このセッションでの修正を反映)
+3. 上記の診断SQLをSQL Editorで実行し、結果を共有(「案件にモニターを紐づけたのに見えない」の原因特定用)
+4. 案件を1件試験作成し、Dropboxに正しくフォルダ(`instagram_handle`名義含む)が作られるか確認
+
+---
+
 ## 未確定・要確認事項の記録
 
 - Dropbox Scoped App / Supabaseプロジェクトは未作成(2026-07-09時点)。M1着手前に準備が必要

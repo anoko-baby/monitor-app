@@ -31,6 +31,13 @@ export function suggestCampaignTitle(productLabel: string, monitorName: string):
   return `${productLabel} モニター(${monitorName}様)`;
 }
 
+// モニターの表示名。招待直後(本登録前)はnameがnullなのでinstagram_handleにフォールバックする。
+// supabase/functions/_shared/profiles.ts の monitorDisplayName と同じロジック(要同期)。
+export function monitorDisplayName(m: { name: string | null; instagramHandle?: string | null } | null | undefined): string {
+  if (!m) return '(モニター不明)';
+  return m.name ?? (m.instagramHandle ? `@${m.instagramHandle}(本登録前)` : '(名前未登録)');
+}
+
 function parseYearMonth(dateStr: string): { year: number; month: number } {
   const [year, month] = dateStr.split('-').map((v) => parseInt(v, 10));
   return { year, month };
