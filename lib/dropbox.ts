@@ -299,6 +299,12 @@ export async function uploadFileToDropboxChunked({
           await saveSession(resumeKey, session);
           continue;
         }
+        // オフセットのズレでは説明できないセッションエラー(例: Dropbox連携先の名前空間を
+        // 変更する前に開始したセッションが、変更後の名前空間からは見えなくなっている等)は
+        // このセッション自体が壊れているとみなし、保存済みのセッションを破棄する。破棄しないと
+        // 「再試行」を押すたびに同じ壊れたセッションを読み込み続けて永久に失敗し続けてしまう。
+        // 破棄後の次回の「再試行」ではupload_session/startからやり直され、正常に完了する。
+        await clearSessionInternal(resumeKey);
       }
       throw err;
     }
