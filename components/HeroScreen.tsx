@@ -24,6 +24,9 @@ type Props = {
   tabs?: HeroTab[];
   activeTab?: string;
   onTabChange?: (key: string) => void;
+  // 詳細・フォーム系の画面用。指定すると見出しの左に戻るボタンを表示する
+  // (ネイティブヘッダーの代わりに、この濃色ヘッダーを主要画面・詳細画面問わず統一するため)。
+  onBack?: () => void;
   children: ReactNode;
 };
 
@@ -31,11 +34,18 @@ const HERO_BG = '#3E3A34'; // ink
 const ACTIVE_COLOR = '#3E3A34';
 const INACTIVE_COLOR = '#8C8579';
 
-export function HeroScreen({ title, subtitle, headerExtra, tabs, activeTab, onTabChange, children }: Props) {
+export function HeroScreen({ title, subtitle, headerExtra, tabs, activeTab, onTabChange, onBack, children }: Props) {
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1, backgroundColor: HERO_BG }}>
       <View className="px-6 pt-2 pb-9">
-        <Text className="font-heading text-title-lg text-white">{title}</Text>
+        <View className="flex-row items-center">
+          {onBack && (
+            <Pressable onPress={onBack} hitSlop={8} style={{ marginRight: 8, marginLeft: -4 }}>
+              <Ionicons name="chevron-back" size={26} color="#ffffff" />
+            </Pressable>
+          )}
+          <Text className="font-heading text-title-lg text-white">{title}</Text>
+        </View>
         {subtitle && <Text className="font-body text-caption mt-1" style={{ color: 'rgba(255,255,255,0.6)' }}>{subtitle}</Text>}
         {headerExtra}
       </View>

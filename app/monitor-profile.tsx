@@ -1,7 +1,9 @@
+import { File } from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
 import { Avatar } from '../components/Avatar';
@@ -10,7 +12,9 @@ import { ChildrenManager } from '../components/ChildrenManager';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { HeroScreen } from '../components/HeroScreen';
 import { TextField } from '../components/TextField';
-import { monitorDisplayName } from '../lib/campaigns';
+import { avatarPublicUrl } from '../lib/avatar';
+import { profileDisplayName } from '../lib/campaigns';
+import { fetchBlobWithRetry } from '../lib/dropbox';
 import { registerPushTokenForCurrentUser } from '../lib/push';
 import { supabase } from '../lib/supabase';
 import { monitorTabItems } from '../lib/tabItems';
@@ -23,6 +27,7 @@ type OwnProfile = {
   prefecture: string | null;
   phone: string | null;
   instagram_handle: string | null;
+  avatar_path: string | null;
   wifi_only_upload: boolean;
 };
 
@@ -35,6 +40,7 @@ export default function MonitorProfile() {
   const [notifGranted, setNotifGranted] = useState<boolean | null>(null);
   const [unreadAnnouncements, setUnreadAnnouncements] = useState(0);
   const [activeTab, setActiveTab] = useState<'info' | 'children'>('info');
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   async function loadUnreadAnnouncements() {
     const { count } = await supabase
@@ -58,7 +64,7 @@ export default function MonitorProfile() {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, name, nickname, email, prefecture, phone, instagram_handle, wifi_only_upload')
+        .select('id, name, nickname, email, prefecture, phone, instagram_handle, avatar_path, wifi_only_upload')
         .eq('auth_user_id', session.user.id)
         .maybeSingle();
       if (error) {
@@ -101,6 +107,49 @@ export default function MonitorProfile() {
     setSaved(true);
   }
 
+  async function handlePickAvatar() {
+    if (!profile) return;
+    setLoadError(null);
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setLoadError('写真へのアクセス許可が必要です');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: false,
+      quality: 0.8,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    if (result.canceled || !result.assets[0]) return;
+
+    setAvatarUploading(true);
+    try {
+      const asset = result.assets[0];
+      const path = `${profile.id}/avatar.jpg`;
+      const body = Platform.OS === 'web' ? await fetchBlobWithRetry(asset.uri) : await new File(asset.uri).bytes();
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, body, { contentType: 'image/jpeg', upsert: true });
+      if (uploadError) throw new Error(uploadError.message);
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_path: path })
+        .eq('id', profile.id);
+      if (updateError) throw new Error(updateError.message);
+
+      setProfile({ ...profile, avatar_path: `${path}?t=${Date.now()}` });
+    } catch (err: any) {
+      setLoadError(`アイコンのアップロードに失敗しました: ${err?.message ?? ''}`);
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
   if (loading) {
     return (
       <View className="flex-1 bg-bg items-center justify-center">
@@ -117,6 +166,13 @@ export default function MonitorProfile() {
     );
   }
 
+  const displayName = profileDisplayName({
+    name: profile.name,
+    nickname: profile.nickname,
+    instagramHandle: profile.instagram_handle,
+  });
+  const avatarUrl = avatarPublicUrl(profile.avatar_path);
+
   return (
     <View className="flex-1">
       <HeroScreen
@@ -124,9 +180,15 @@ export default function MonitorProfile() {
         subtitle={profile.instagram_handle ? `@${profile.instagram_handle}` : undefined}
         headerExtra={
           <View className="flex-row items-center mt-4" style={{ gap: 12 }}>
-            <Avatar label={monitorDisplayName({ name: profile.name, instagramHandle: profile.instagram_handle })} />
+            <Pressable onPress={handlePickAvatar} disabled={avatarUploading}>
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+              ) : (
+                <Avatar label={displayName} />
+              )}
+            </Pressable>
             <Text className="font-body-medium text-body text-white">
-              {monitorDisplayName({ name: profile.name, instagramHandle: profile.instagram_handle })}
+              {displayName}様{avatarUploading ? '(アップロード中…)' : ''}
             </Text>
           </View>
         }
@@ -142,6 +204,15 @@ export default function MonitorProfile() {
 
           {activeTab === 'info' ? (
             <>
+              <Pressable onPress={handlePickAvatar} disabled={avatarUploading} className="items-center mb-4">
+                {avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={{ width: 72, height: 72, borderRadius: 36 }} />
+                ) : (
+                  <Avatar label={displayName} size={72} />
+                )}
+                <Text className="font-body text-caption text-accent-ink mt-2">アイコンを変更する</Text>
+              </Pressable>
+
               <TextField label="氏名" value={profile.name ?? ''} editable={false} />
               <TextField
                 label="Instagramアカウント名"

@@ -5,6 +5,7 @@ import { FlatList, Pressable, Text, View } from 'react-native';
 import { BottomTabBar } from '../components/BottomTabBar';
 import { CycleDots } from '../components/CycleDots';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroProfileBadge } from '../components/HeroProfileBadge';
 import { HeroScreen } from '../components/HeroScreen';
 import { CycleDotStatus, deriveCycleStatus } from '../lib/campaigns';
 import { supabase } from '../lib/supabase';
@@ -163,6 +164,7 @@ export default function MonitorHome() {
       <HeroScreen
         title="あなたの案件"
         subtitle={`未提出 ${campaigns.filter((c) => c.pendingCount > 0).length}件`}
+        headerExtra={<HeroProfileBadge />}
         tabs={[
           { key: 'pending', label: '未提出', icon: 'time-outline', activeIcon: 'time' },
           { key: 'done', label: '提出済み', icon: 'checkmark-circle-outline', activeIcon: 'checkmark-circle' },

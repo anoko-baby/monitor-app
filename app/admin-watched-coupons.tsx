@@ -3,7 +3,9 @@ import { FlatList, Switch, Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroScreen } from '../components/HeroScreen';
 import { TextField } from '../components/TextField';
+import { goBackOrReplace } from '../lib/navigation';
 import { supabase } from '../lib/supabase';
 
 type WatchedCoupon = {
@@ -76,7 +78,8 @@ export default function AdminWatchedCoupons() {
   }
 
   return (
-    <View className="flex-1 bg-bg px-6 pt-6">
+    <HeroScreen title="監視クーポン登録" onBack={() => goBackOrReplace('/admin-home')}>
+    <View className="flex-1 px-6 pt-6">
       <TextField label="クーポンコード" value={code} onChangeText={setCode} autoCapitalize="characters" />
       <TextField label="ラベル(任意)" value={label} onChangeText={setLabel} />
 
@@ -110,5 +113,6 @@ export default function AdminWatchedCoupons() {
         )}
       />
     </View>
+    </HeroScreen>
   );
 }

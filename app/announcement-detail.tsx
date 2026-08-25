@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroScreen } from '../components/HeroScreen';
+import { goBackOrReplace } from '../lib/navigation';
 import { supabase } from '../lib/supabase';
 
 type Announcement = {
@@ -69,11 +71,12 @@ export default function AnnouncementDetail() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-bg" contentContainerStyle={{ padding: 24 }}>
-      {announcement.sentAt && (
-        <Text className="font-body text-caption text-ink-soft mb-2">{announcement.sentAt.slice(0, 10)}</Text>
-      )}
-      <Text className="font-heading text-title-lg text-ink mb-4">{announcement.title}</Text>
+    <HeroScreen
+      title={announcement.title}
+      subtitle={announcement.sentAt ? announcement.sentAt.slice(0, 10) : undefined}
+      onBack={() => goBackOrReplace('/announcements')}
+    >
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
       <Text className="font-body text-body text-ink mb-6">{announcement.body}</Text>
 
       {announcement.linkUrl && (
@@ -85,5 +88,6 @@ export default function AnnouncementDetail() {
         </Pressable>
       )}
     </ScrollView>
+    </HeroScreen>
   );
 }

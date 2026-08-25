@@ -5,8 +5,10 @@ import { ActivityIndicator, Image, Pressable, ScrollView, Switch, Text, View } f
 import { AppButton } from '../components/AppButton';
 import { CycleDots } from '../components/CycleDots';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroScreen } from '../components/HeroScreen';
 import { TextField } from '../components/TextField';
 import {
+  childDisplayName,
   CycleDotStatus,
   deriveCycleStatus,
   formatCampaignNo,
@@ -14,6 +16,7 @@ import {
   monitorDisplayName,
   suggestCampaignTitle,
 } from '../lib/campaigns';
+import { goBackOrReplace } from '../lib/navigation';
 import { supabase } from '../lib/supabase';
 
 type ProductSelection = {
@@ -745,17 +748,17 @@ export default function AdminCampaignForm() {
     }
 
     return (
+      <HeroScreen
+        title={title || '案件編集'}
+        subtitle={`${formatCampaignNo(editCampaign.campaignNo)} ・ ${editCampaign.monitorName ?? '(モニター不明)'}`}
+        onBack={() => goBackOrReplace('/admin-campaign-list')}
+      >
       <ScrollView
-      className="flex-1 bg-bg"
+      className="flex-1"
       contentContainerStyle={{ padding: 24 }}
       keyboardShouldPersistTaps="handled"
     >
-        <Text className="font-body text-caption text-ink-soft mb-1">
-          {formatCampaignNo(editCampaign.campaignNo)}
-        </Text>
-        <Text className="font-body text-caption text-ink-soft mb-1">
-          {editCampaign.monitorName ?? '(モニター不明)'} ・ {editCampaign.productSummary}
-        </Text>
+        <Text className="font-body text-caption text-ink-soft mb-1">{editCampaign.productSummary}</Text>
         <Text className="font-body text-caption text-ink-soft mb-6">{editCampaign.recurrenceSummary}</Text>
 
         <TextField label="案件名" value={title} onChangeText={setTitle} />
@@ -815,12 +818,14 @@ export default function AdminCampaignForm() {
           </Text>
         )}
       </ScrollView>
+      </HeroScreen>
     );
   }
 
   return (
+    <HeroScreen title="新規案件作成" onBack={() => goBackOrReplace('/admin-campaign-list')}>
     <ScrollView
-      className="flex-1 bg-bg"
+      className="flex-1"
       contentContainerStyle={{ padding: 24 }}
       keyboardShouldPersistTaps="handled"
     >
@@ -886,7 +891,7 @@ export default function AdminCampaignForm() {
                     selectedChildId === c.id ? 'text-white' : 'text-ink'
                   }`}
                 >
-                  {c.call_name}
+                  {childDisplayName(c.call_name)}
                 </Text>
               </Pressable>
             ))}
@@ -1176,5 +1181,6 @@ export default function AdminCampaignForm() {
         loading={submitting}
       />
     </ScrollView>
+    </HeroScreen>
   );
 }

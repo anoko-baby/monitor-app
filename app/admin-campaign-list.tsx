@@ -5,6 +5,7 @@ import { FlatList, Pressable, Text, View } from 'react-native';
 import { BottomTabBar } from '../components/BottomTabBar';
 import { CycleDots } from '../components/CycleDots';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroProfileBadge } from '../components/HeroProfileBadge';
 import { HeroScreen } from '../components/HeroScreen';
 import { StatusPill } from '../components/StatusPill';
 import { CycleDotStatus, deriveCycleStatus, formatCampaignNo, monitorDisplayName } from '../lib/campaigns';
@@ -89,6 +90,7 @@ export default function AdminCampaignList() {
       <HeroScreen
         title="案件一覧"
         subtitle={`進行中 ${campaigns.filter((c) => c.status === 'active').length}件`}
+        headerExtra={<HeroProfileBadge />}
         tabs={[
           { key: 'active', label: '進行中', icon: 'time-outline', activeIcon: 'time' },
           { key: 'done', label: '完了・中止', icon: 'checkmark-done-outline', activeIcon: 'checkmark-done' },

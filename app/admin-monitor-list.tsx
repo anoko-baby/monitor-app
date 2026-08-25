@@ -5,6 +5,7 @@ import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native
 import { Avatar } from '../components/Avatar';
 import { BottomTabBar } from '../components/BottomTabBar';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroProfileBadge } from '../components/HeroProfileBadge';
 import { HeroScreen } from '../components/HeroScreen';
 import { StatusPill } from '../components/StatusPill';
 import { supabase } from '../lib/supabase';
@@ -53,6 +54,7 @@ export default function AdminMonitorList() {
       <HeroScreen
         title="モニター一覧"
         subtitle={`有効 ${monitors.filter((m) => m.status === 'active').length}名`}
+        headerExtra={<HeroProfileBadge />}
         tabs={[
           { key: 'all', label: 'すべて', icon: 'people-outline', activeIcon: 'people' },
           { key: 'active', label: '有効', icon: 'checkmark-circle-outline', activeIcon: 'checkmark-circle' },

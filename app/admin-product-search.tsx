@@ -3,7 +3,9 @@ import { FlatList, Image, Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroScreen } from '../components/HeroScreen';
 import { TextField } from '../components/TextField';
+import { goBackOrReplace } from '../lib/navigation';
 import { supabase } from '../lib/supabase';
 
 type Variant = {
@@ -52,7 +54,8 @@ export default function AdminProductSearch() {
   }
 
   return (
-    <View className="flex-1 bg-bg px-6 pt-6">
+    <HeroScreen title="商品検索" onBack={() => goBackOrReplace('/admin-home')}>
+    <View className="flex-1 px-6 pt-6">
       <View className="flex-row items-end mb-2">
         <View className="flex-1 mr-2">
           <TextField label="商品検索" value={query} onChangeText={setQuery} placeholder="商品名など" />
@@ -101,5 +104,6 @@ export default function AdminProductSearch() {
         )}
       />
     </View>
+    </HeroScreen>
   );
 }

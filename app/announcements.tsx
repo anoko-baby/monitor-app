@@ -5,6 +5,7 @@ import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native
 
 import { BottomTabBar } from '../components/BottomTabBar';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroProfileBadge } from '../components/HeroProfileBadge';
 import { HeroScreen } from '../components/HeroScreen';
 import { supabase } from '../lib/supabase';
 import { monitorTabItems } from '../lib/tabItems';
@@ -64,6 +65,7 @@ export default function Announcements() {
       <HeroScreen
         title="お知らせ"
         subtitle={`未読 ${rows.filter((r) => r.isUnread).length}件`}
+        headerExtra={<HeroProfileBadge />}
         tabs={[
           { key: 'unread', label: '未読', icon: 'mail-unread-outline', activeIcon: 'mail-unread' },
           { key: 'read', label: '既読', icon: 'mail-open-outline', activeIcon: 'mail-open' },

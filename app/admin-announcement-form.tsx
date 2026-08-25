@@ -4,7 +4,9 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroScreen } from '../components/HeroScreen';
 import { TextField } from '../components/TextField';
+import { goBackOrReplace } from '../lib/navigation';
 import { supabase } from '../lib/supabase';
 
 type MonitorOption = { id: string; name: string | null; nickname: string | null };
@@ -126,9 +128,8 @@ export default function AdminAnnouncementForm() {
 
   if (previewTargets) {
     return (
-      <ScrollView className="flex-1 bg-bg" contentContainerStyle={{ padding: 24 }}>
-        <Text className="font-heading text-title-lg text-ink mb-4">配信内容の確認</Text>
-
+      <HeroScreen title="配信内容の確認" onBack={() => setPreviewTargets(null)}>
+      <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
         <View className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-4">
           <Text className="font-body-medium text-body text-ink mb-1">{title}</Text>
           <Text className="font-body text-caption text-ink-soft">{body}</Text>
@@ -164,12 +165,14 @@ export default function AdminAnnouncementForm() {
           <AppButton label="戻って修正する" variant="secondary" onPress={() => setPreviewTargets(null)} />
         </View>
       </ScrollView>
+      </HeroScreen>
     );
   }
 
   return (
+    <HeroScreen title="お知らせ作成・配信" onBack={() => goBackOrReplace('/admin-announcement-list')}>
     <ScrollView
-      className="flex-1 bg-bg"
+      className="flex-1"
       contentContainerStyle={{ padding: 24 }}
       keyboardShouldPersistTaps="handled"
     >
@@ -277,5 +280,6 @@ export default function AdminAnnouncementForm() {
         <AppButton label={previewLoading ? '確認中…' : '配信内容を確認する'} onPress={handlePreview} loading={previewLoading} />
       </View>
     </ScrollView>
+    </HeroScreen>
   );
 }

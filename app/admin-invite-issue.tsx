@@ -3,7 +3,9 @@ import { Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroScreen } from '../components/HeroScreen';
 import { TextField } from '../components/TextField';
+import { goBackOrReplace } from '../lib/navigation';
 import { supabase } from '../lib/supabase';
 
 const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 0/O/1/I等紛らわしい文字は除外
@@ -61,39 +63,42 @@ export default function AdminInviteIssue() {
 
   if (issuedCode) {
     return (
-      <View className="flex-1 bg-bg px-6 pt-6 items-center">
-        <Text className="font-heading text-title-lg text-ink mb-6">招待コードを発行しました</Text>
-        <View className="bg-surface rounded-card border-hairline border-line px-8 py-6 mb-6">
-          <Text className="font-body text-title-lg text-ink" style={{ letterSpacing: 6 }}>
-            {issuedCode}
+      <HeroScreen title="招待コードを発行しました" onBack={() => goBackOrReplace('/admin-monitor-list')}>
+        <View className="flex-1 px-6 pt-6 items-center">
+          <View className="bg-surface rounded-card border-hairline border-line px-8 py-6 mb-6">
+            <Text className="font-body text-title-lg text-ink" style={{ letterSpacing: 6 }}>
+              {issuedCode}
+            </Text>
+          </View>
+          <Text className="font-body text-caption text-ink-soft text-center">
+            このコードをLINE等でモニターに送付してください(有効期限{INVITE_EXPIRY_DAYS}日)
           </Text>
         </View>
-        <Text className="font-body text-caption text-ink-soft text-center">
-          このコードをLINE等でモニターに送付してください(有効期限{INVITE_EXPIRY_DAYS}日)
-        </Text>
-      </View>
+      </HeroScreen>
     );
   }
 
   return (
-    <View className="flex-1 bg-bg px-6 pt-6">
-      <TextField
-        label="Instagramアカウント名"
-        value={instagramHandle}
-        onChangeText={setInstagramHandle}
-        autoCapitalize="none"
-        autoCorrect={false}
-        placeholder="anoko_monitor"
-      />
+    <HeroScreen title="モニターを招待する" onBack={() => goBackOrReplace('/admin-monitor-list')}>
+      <View className="flex-1 px-6 pt-6">
+        <TextField
+          label="Instagramアカウント名"
+          value={instagramHandle}
+          onChangeText={setInstagramHandle}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholder="anoko_monitor"
+        />
 
-      {error && <ErrorBanner message={error} />}
+        {error && <ErrorBanner message={error} />}
 
-      <AppButton
-        label={loading ? '発行中…' : '招待コードを発行する'}
-        onPress={handleIssue}
-        disabled={!instagramHandle.trim()}
-        loading={loading}
-      />
-    </View>
+        <AppButton
+          label={loading ? '発行中…' : '招待コードを発行する'}
+          onPress={handleIssue}
+          disabled={!instagramHandle.trim()}
+          loading={loading}
+        />
+      </View>
+    </HeroScreen>
   );
 }

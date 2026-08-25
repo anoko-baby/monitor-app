@@ -6,6 +6,7 @@ import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 import { AppButton } from '../components/AppButton';
 import { BottomTabBar } from '../components/BottomTabBar';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroProfileBadge } from '../components/HeroProfileBadge';
 import { HeroScreen } from '../components/HeroScreen';
 import { supabase } from '../lib/supabase';
 import { ADMIN_TAB_ITEMS } from '../lib/tabItems';
@@ -59,7 +60,7 @@ export default function AdminAnnouncementList() {
 
   return (
     <View className="flex-1">
-      <HeroScreen title="お知らせ配信" subtitle={`配信済み ${rows.length}件`}>
+      <HeroScreen title="お知らせ配信" subtitle={`配信済み ${rows.length}件`} headerExtra={<HeroProfileBadge />}>
       <View className="flex-1 px-6 pt-4">
       <View className="mb-4">
         <AppButton label="お知らせを作成・配信する" onPress={() => router.push('/admin-announcement-form')} />

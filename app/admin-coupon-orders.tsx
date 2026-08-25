@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroScreen } from '../components/HeroScreen';
 import { monitorDisplayName } from '../lib/campaigns';
+import { goBackOrReplace } from '../lib/navigation';
 import { supabase } from '../lib/supabase';
 
 type CouponOrder = {
@@ -80,7 +82,8 @@ export default function AdminCouponOrders() {
   }
 
   return (
-    <View className="flex-1 bg-bg px-6 pt-6">
+    <HeroScreen title="クーポン注文" onBack={() => goBackOrReplace('/admin-home')}>
+    <View className="flex-1 px-6 pt-6">
       {loadError && <ErrorBanner message={loadError} />}
       {loading && <Text className="font-body text-caption text-ink-soft">読み込み中…</Text>}
 
@@ -120,5 +123,6 @@ export default function AdminCouponOrders() {
         )}
       />
     </View>
+    </HeroScreen>
   );
 }
