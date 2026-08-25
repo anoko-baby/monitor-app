@@ -1,10 +1,12 @@
+import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { TextField } from '../components/TextField';
+import { registerPushTokenForCurrentUser } from '../lib/push';
 import { supabase } from '../lib/supabase';
 
 export default function AdminLogin() {
@@ -24,6 +26,16 @@ export default function AdminLogin() {
     if (signInError) {
       setError('メールアドレスまたはパスワードが正しくありません');
       return;
+    }
+
+    // 管理者/スタッフもN5(提出通知)・N7(期限超過報告)・N11(クーポン注文)・N12(異常検知)の宛先になるため、
+    // モニターと同様にログイン時に通知許可を求める(拒否されてもログイン自体はブロックしない)。
+    // Web版はWeb Push未整備のため、許可リクエスト自体を行わない。
+    if (Platform.OS !== 'web') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status === 'granted') {
+        await registerPushTokenForCurrentUser();
+      }
     }
 
     router.replace('/admin-home');

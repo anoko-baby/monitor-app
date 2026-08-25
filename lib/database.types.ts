@@ -39,6 +39,119 @@ export type Database = {
   }
   public: {
     Tables: {
+      announcement_targets: {
+        Row: {
+          announcement_id: string
+          created_at: string
+          id: string
+          monitor_id: string
+          read_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          announcement_id: string
+          created_at?: string
+          id?: string
+          monitor_id: string
+          read_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          announcement_id?: string
+          created_at?: string
+          id?: string
+          monitor_id?: string
+          read_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_targets_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcement_targets_monitor_id_fkey"
+            columns: ["monitor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcements: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string
+          id: string
+          link_label: string | null
+          link_url: string | null
+          segment_id: string | null
+          sent_at: string | null
+          target_type: Database["public"]["Enums"]["announcement_target_type"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by: string
+          id?: string
+          link_label?: string | null
+          link_url?: string | null
+          segment_id?: string | null
+          sent_at?: string | null
+          target_type?: Database["public"]["Enums"]["announcement_target_type"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          link_label?: string | null
+          link_url?: string | null
+          segment_id?: string | null
+          sent_at?: string | null
+          target_type?: Database["public"]["Enums"]["announcement_target_type"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      app_settings: {
+        Row: {
+          created_at: string
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          created_at?: string
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       campaign_form_fields: {
         Row: {
           campaign_id: string
@@ -475,6 +588,88 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notification_logs: {
+        Row: {
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at: string
+          id: string
+          profile_id: string
+          result: Database["public"]["Enums"]["notification_result"]
+          sent_at: string
+          task_id: string | null
+          template_key: string
+          updated_at: string
+        }
+        Insert: {
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          id?: string
+          profile_id: string
+          result: Database["public"]["Enums"]["notification_result"]
+          sent_at?: string
+          task_id?: string | null
+          template_key: string
+          updated_at?: string
+        }
+        Update: {
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          id?: string
+          profile_id?: string
+          result?: Database["public"]["Enums"]["notification_result"]
+          sent_at?: string
+          task_id?: string | null
+          template_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_logs_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_logs_template_key_fkey"
+            columns: ["template_key"]
+            isOneToOne: false
+            referencedRelation: "notification_templates"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      notification_templates: {
+        Row: {
+          body: string
+          created_at: string
+          key: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          key: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          key?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       products: {
         Row: {
@@ -924,12 +1119,15 @@ export type Database = {
       }
     }
     Enums: {
+      announcement_target_type: "all" | "manual" | "segment"
       campaign_recurrence_type: "once" | "monthly"
       campaign_sns_frequency: "every_cycle" | "once"
       campaign_status: "active" | "completed" | "cancelled"
       child_sex: "male" | "female"
       coupon_order_status: "pending" | "converted" | "skipped"
       form_field_input_type: "date" | "number" | "select" | "text"
+      notification_channel: "push"
+      notification_result: "sent" | "failed" | "skipped_no_token" | "skipped_notify_off"
       profile_role: "admin" | "staff" | "monitor"
       profile_status: "invited" | "active" | "inactive"
       review_action: "approved" | "rejected"
@@ -1071,12 +1269,15 @@ export const Constants = {
   },
   public: {
     Enums: {
+      announcement_target_type: ["all", "manual", "segment"],
       campaign_recurrence_type: ["once", "monthly"],
       campaign_sns_frequency: ["every_cycle", "once"],
       campaign_status: ["active", "completed", "cancelled"],
       child_sex: ["male", "female"],
       coupon_order_status: ["pending", "converted", "skipped"],
       form_field_input_type: ["date", "number", "select", "text"],
+      notification_channel: ["push"],
+      notification_result: ["sent", "failed", "skipped_no_token", "skipped_notify_off"],
       profile_role: ["admin", "staff", "monitor"],
       profile_status: ["invited", "active", "inactive"],
       review_action: ["approved", "rejected"],

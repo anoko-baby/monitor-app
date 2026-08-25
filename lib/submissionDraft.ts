@@ -17,7 +17,7 @@ export type DraftFile = {
   errorMessage?: string;
   dropboxPath?: string;
   dropboxSharedUrl?: string;
-  thumbnailPath?: string;
+  thumbnailPath?: string | null;
   durationSec?: number;
 };
 

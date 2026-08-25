@@ -5,11 +5,15 @@ import { AppButton } from '../components/AppButton';
 import { Screen } from '../components/Screen';
 import { supabase } from '../lib/supabase';
 
-const LINKS: { label: string; href: '/admin-invite-issue' | '/admin-product-search' | '/admin-watched-coupons' | '/admin-coupon-orders' }[] = [
+const LINKS: {
+  label: string;
+  href: '/admin-invite-issue' | '/admin-product-search' | '/admin-watched-coupons' | '/admin-coupon-orders' | '/admin-announcement-list';
+}[] = [
   { label: 'モニターを招待する', href: '/admin-invite-issue' },
   { label: '商品検索(Shopify)', href: '/admin-product-search' },
   { label: '監視クーポン登録', href: '/admin-watched-coupons' },
   { label: 'クーポン注文', href: '/admin-coupon-orders' },
+  { label: 'お知らせ配信', href: '/admin-announcement-list' },
 ];
 
 export default function AdminHome() {

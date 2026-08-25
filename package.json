@@ -43,5 +43,9 @@
     "@types/react": "~19.1.10",
     "typescript": "~5.9.2"
   },
+  "overrides": {
+    "buffer": "6.0.3",
+    "yaml": "2.9.0"
+  },
   "private": true
 }

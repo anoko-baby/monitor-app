@@ -1,11 +1,12 @@
 import * as Notifications from 'expo-notifications';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, Switch, Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
 import { ChildrenManager } from '../components/ChildrenManager';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { TextField } from '../components/TextField';
+import { registerPushTokenForCurrentUser } from '../lib/push';
 import { supabase } from '../lib/supabase';
 
 type OwnProfile = {
@@ -37,8 +38,13 @@ export default function MonitorProfile() {
         .maybeSingle();
       setProfile(data);
 
-      const permission = await Notifications.getPermissionsAsync();
-      setNotifGranted(permission.status === 'granted');
+      if (Platform.OS !== 'web') {
+        const permission = await Notifications.getPermissionsAsync();
+        setNotifGranted(permission.status === 'granted');
+        if (permission.status === 'granted') {
+          await registerPushTokenForCurrentUser();
+        }
+      }
 
       setLoading(false);
     })();
@@ -77,21 +83,25 @@ export default function MonitorProfile() {
       />
       <TextField label="メールアドレス" value={profile.email ?? ''} editable={false} />
 
-      <Text className="font-body-medium text-body text-ink mb-2 mt-2">通知</Text>
-      {notifGranted === false && (
-        <ErrorBanner message="通知が許可されていません。設定アプリから通知を有効にしてください。" />
-      )}
-      {notifGranted === true && (
-        <Text className="font-body text-caption text-ink-soft mb-4">通知は許可されています</Text>
-      )}
+      {Platform.OS !== 'web' && (
+        <>
+          <Text className="font-body-medium text-body text-ink mb-2 mt-2">通知</Text>
+          {notifGranted === false && (
+            <ErrorBanner message="通知が許可されていません。設定アプリから通知を有効にしてください。" />
+          )}
+          {notifGranted === true && (
+            <Text className="font-body text-caption text-ink-soft mb-4">通知は許可されています</Text>
+          )}
 
-      <View className="flex-row items-center justify-between mb-6">
-        <Text className="font-body text-body text-ink flex-1 pr-4">Wi-Fi接続時のみアップロード</Text>
-        <Switch
-          value={profile.wifi_only_upload}
-          onValueChange={(v) => setProfile({ ...profile, wifi_only_upload: v })}
-        />
-      </View>
+          <View className="flex-row items-center justify-between mb-6">
+            <Text className="font-body text-body text-ink flex-1 pr-4">Wi-Fi接続時のみアップロード</Text>
+            <Switch
+              value={profile.wifi_only_upload}
+              onValueChange={(v) => setProfile({ ...profile, wifi_only_upload: v })}
+            />
+          </View>
+        </>
+      )}
 
       <AppButton label={saving ? '保存中…' : '保存する'} onPress={handleSave} loading={saving} />
       {saved && (

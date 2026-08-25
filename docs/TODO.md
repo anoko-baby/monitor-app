@@ -176,7 +176,7 @@ Dropboxのリフレッシュトークンと同じ考え方)。
 
 ---
 
-## M8. 通知+お知らせ配信
+## M8. 通知+お知らせ配信 ✅実装済み(2026-08-25)・実機確認待ち
 
 - プッシュ通知(N1・N2・N3・N4・N5・N6・N7・N9・N10・N11・N12)+ Supabase Cron設定
 - お知らせ作成・配信画面(全モニター/個別選択、リンクボタン、対象人数プレビュー)+ モニター側お知らせ一覧・詳細(未読バッジ)
@@ -185,9 +185,26 @@ Dropboxのリフレッシュトークンと同じ考え方)。
 - 実機で各トリガー(アサイン・差し戻し・検収完了・期限リマインド・期限超過督促・お知らせ配信)でPush通知が届く
 - お知らせ配信で対象プレビュー→送信→モニター側で既読管理ができる
 
+**実装メモ**
+- DBは`notification_templates`(N1〜N7,N9〜N12のテンプレをシード。N9はannouncements自体のtitle/bodyを都度使うためプレースホルダー行のみ)/`notification_logs`/`app_settings`(admin onlyのRLS。リマインド日程[7,1]・超過督促+2日・到着確認5日等をシード)/`announcements`/`announcement_targets`を新設
+- 即時通知(N1案件アサイン・N3差し戻し・N4確認済み・N5モニター提出・N9お知らせ配信)は`notify-dispatch` Edge Functionを新設し、該当する各画面(案件作成・検収・データ/SNS提出・お知らせ配信)から操作成功後に呼び出す方式にした。呼び出し元のJWTで「本人か・権限があるか」を確認したうえで、push_token取得・送信・ログ記録のみservice roleで行う(N5はモニターがstaff/adminのpush_tokenを読む必要があり、モニターのRLSでは読めないため)
+- 日次通知(N2期限7日前/前日・N6期限超過督促・N7期限超過報告・N10到着確認リマインド)は`notify-cron`、外部連携異常検知(N12: Dropboxトークン失効/Shopify APIエラー/Dropbox容量80%超過)は`notify-health-check`をそれぞれ新設。pg_cron+pg_net(Supabase公式のEdge Function定期実行パターン)で毎朝9:00 JST(=00:00 UTC)に起動する設定をmigrationに含めた
+- Cron用Edge Functionはservice roleではなく`CRON_SECRET`という共有シークレット(ヘッダー`x-cron-secret`)で認証する。値そのものをmigrationやチャットに含めないため、**適用後に一度だけ、ご自身のターミナル/SQL Editorから以下を実行してください**:
+  ```sql
+  select vault.create_secret('<任意のランダム文字列>', 'cron_secret');
+  ```
+  ```
+  npx supabase secrets set CRON_SECRET="<vaultに保存したのと同じ値>"
+  ```
+- N11(クーポン注文検知)は`shopify-webhook`に直接追加(既存のservice role実装のまま)。Webhookの再送で同じ注文が再度届いても、初回検知時のみ通知するようにした
+- push_token取得(`lib/push.ts`)は`expo-notifications`の`getExpoPushTokenAsync({projectId})`を使うが、**EASのprojectIdが未設定の間は静かにスキップする**実装にしている。実際にPushが届くようになるのはM9でEASプロジェクトを作成(`eas init`など)した後。それまでは通知許可は取得・保存されるが、push_tokenは空のままになる
+- 管理者/スタッフはこれまで通知許可を求めていなかった(N5/N7/N11/N12の宛先になるため今回追加)。ログイン成功時に許可リクエスト+トークン登録を行うが、モニターと異なりブロッキングにはしていない(仕様書3.8はモニターの必須オンボーディングのみを求めている)
+- お知らせは「作成=即配信」で下書き状態を持たない(3.9の要求どおり、作成画面内でプレビュー→送信の2ステップにした)
+- `docs/TODO.md`未確定事項として残す: 実機でのPush到達確認はEASプロジェクト作成後(M9着手時)にまとめて行う想定
+
 ---
 
-## M9. TestFlight・限定公開配信+βテスト運用
+## M9. TestFlight・限定公開配信+βテスト運用 🚧準備中(2026-08-25)
 
 - EAS Build設定、Apple Developer / Google Play アカウント確認
 - TestFlightへの配信、Android限定公開への配信
@@ -195,6 +212,61 @@ Dropboxのリフレッシュトークンと同じ考え方)。
 
 **完了条件**
 - 協力モニターがTestFlight経由でアプリをインストールし、ログイン〜データ提出までを実機で一通り完了できる
+
+**準備状況(2026-08-25時点)**
+- Apple Developer Program / Google Play Console: Azusaさん側で登録済み
+- bundle identifier / package name は `com.anoko.monitor`(iOS/Android共通)に決定。`app.json`に設定済み
+- `app.json`: `expo-image-picker`(写真ライブラリ利用許諾文言)・`expo-notifications`(通知アイコン色)のconfig pluginを追加、iOSの`ITSAppUsesNonExemptEncryption: false`も設定済み(暗号化に関する審査質問を回避)
+- `eas.json`を新設(development/preview/production の3プロファイル。productionは`autoIncrement: true`でビルド番号を自動採番)
+- **EASプロジェクト自体は未作成**(`eas login`/`eas init`/`eas build:configure`は今回のセッションでは未実施)。このセッション(GitHub連携のリモート実行環境)にはAzusaさんのExpoアカウントでのログイン手段が無いため、以下は**Azusaさんご自身のPC(ローカルのクローン、またはこのプロジェクト本来のDropbox同期フォルダ)のターミナルから実行**してください:
+  ```
+  npx eas login
+  npx eas init          # 初回のみ。projectIdが払い出され app.json の extra.eas.projectId に自動追記される
+  npx eas build:configure
+  npx eas build --platform ios --profile production
+  npx eas build --platform android --profile production
+  ```
+  ビルド完了後、配信は:
+  ```
+  npx eas submit --platform ios --profile production      # App Store Connect → TestFlight
+  npx eas submit --platform android --profile production  # Google Play Console(アップロード後、Play Console側で内部テスト/非公開テストのトラックに手動で割り当て)
+  ```
+  Android提出時にPlay Consoleのサービスアカウントキー(json)を聞かれた場合は、Google Play Console側でAPIアクセス用のサービスアカウントを作成し、ローカルのファイルパスを指定してください(このやり取りもチャットには値を貼らないこと)。
+- **`extra.eas.projectId`が設定されるまで、M8で実装したPush通知のトークン取得(`lib/push.ts`)は静かにスキップされ続ける**。`eas init`実行後にコードの変更は不要(Expoが`app.json`を自動更新するため)だが、実機でのPush到達確認は`eas init`実施後に行うこと
+- 併せて、M8実装メモに記載した`CRON_SECRET`のvault登録(`select vault.create_secret(...)`+`npx supabase secrets set CRON_SECRET=...`)もまだ未実施。日次通知(N2/N6/N7/N10)・異常検知(N12)を実機で確認する前に済ませておくこと
+- 上記の`eas init`実行後、次のセッションでは`app.json`の差分(`extra.eas.projectId`)を取り込んでから、ビルド後の実機確認・TestFlight配信・Google Play限定公開・βテスト運用手順の作成に進む
+
+**実機検証で見つかった不具合と直し方(2026-08-25)**
+- 初回`eas build`が「Install dependencies」フェーズで失敗。原因は`package-lock.json`が`package.json`と非同期(`npm ci`が使えない状態)だったこと。さらに`buffer`(`@xoi/gps-metadata-remover`→`crc`が6.0.3、`expo`→`whatwg-url-without-unicode`が5.7.1を要求)と`yaml`(`@expo/ngrok`が1.10.3、`expo`/`react-native`/`tailwindcss`側が2.9.0を要求)がそれぞれ2つの互換性のないバージョンを要求する依存関係になっており、`npm install`を実行するたびに解決結果が不安定に変わっていた。`package.json`に`overrides`(`buffer: 6.0.3` / `yaml: 2.9.0`)を追加して単一バージョンに固定し、`npm install`→`package-lock.json`更新で解消(`npm ci`を3回連続実行して安定することを確認済み)
+- ビルド自体は成功しTestFlightにインストールできたが、起動直後にクラッシュ。原因は`.env`が`.gitignore`対象でEASにアップロードされず、`EXPO_PUBLIC_SUPABASE_URL`/`EXPO_PUBLIC_SUPABASE_ANON_KEY`が未設定のまま`lib/supabase.ts`が起動時にthrowしていたこと。[expo.dev](https://expo.dev/accounts/anokobaby/projects/anoko-monitor) → Environment variables で、Production環境(Plain text)にこの2つを登録し、再ビルドすることで解消する想定(**再ビルド後の実機確認はまだ**)
+
+---
+
+## Web版(モニター提出・管理者機能の緊急対応) 🚧実装済み・実機/デプロイ未確認(2026-08-25)
+
+TestFlight配信の本稼働までまだ時間がかかるため、モニターに至急データ提出をお願いできるよう、既存のExpo Router(react-native-web)アプリをそのままWebでも動かす対応を優先実施。ネイティブ専用API依存を洗い出し、Web版では別実装に差し替えた。Vercelへの無料URLでのホスティングを想定(範囲: モニター側+管理者側の両方。仕様書には元々Web版の記載はなく、今回の緊急対応として追加)。
+
+**対応した箇所**
+- `lib/dropbox.ts`: チャンクアップロードをWeb版は`fetch`+`Blob.slice()`で直接送信するよう分岐(expo-file-systemはWeb未対応のため一時ファイル書き出し方式が使えない。むしろネイティブ側で問題になった「fetchがBlobボディ非対応」という制約はブラウザには無いため、実装はシンプルになった)
+- `lib/mediaPipeline.ts`:
+  - GPS除去(`stripGpsMetadata`): Web版はblob:URLの中身をメモリ上のUint8Arrayとして読み書きし、処理後に新しいBlob/blob:URLを返す方式に変更(expo-file-systemの新File/FileHandle APIがWeb未対応のため)。戻り値のURIを以後の処理で使うよう`processAndUploadFile`側も修正
+  - 動画サムネイル(`generateVideoThumbnail`): expo-video-thumbnailsはWeb実装が「throw」するだけで実質未対応のため、`<video>`+`<canvas>`で自前にフレームを取得する処理を追加
+  - 写真サムネイル・HEIC→JPEG変換: expo-image-manipulatorは実はWeb版でもcanvasベースの実装が存在するため無改修で動作。ただしHEICは大半のブラウザ(Safari以外)がデコードできないため、失敗時はWeb版のみ元ファイルのまま続行・サムネイルなしで処理を続ける(`ProcessedFileResult.thumbnailPath`をnull許容に変更)
+  - サムネイルのSupabase Storageアップロード: Web版は`fetch(uri).blob()`で取得したBlobをそのまま渡す方式に変更(expo-file-systemのFile APIが使えないため)
+- Push通知関連(`lib/push.ts`, `app/consent.tsx`, `app/admin-login.tsx`, `app/monitor-profile.tsx`): Web Push(service worker/VAPID)は未整備のため、Web版では許可リクエスト自体を行わずスキップ。モニター側のオンボーディング(3.8の必須ステップ)もWeb版は通知許可なしでそのまま進める
+- Wi-Fi限定アップロード: ブラウザはWi-Fi/モバイル回線を区別できないため、Web版は常にOFF扱い(設定项目もプロフィール画面から非表示)
+- `vercel.json`新設: SPA(`expo export -p web`のデフォルト出力)のため、全パスを`index.html`にrewriteする設定が必須(無いと`/admin-login`等への直接アクセス・リロードが404になる)。`"web": {"output": "static"}`も試したが、SSR時に`window`未定義でAsyncStorage/Supabaseクライアントの初期化がクラッシュしたため見送り、デフォルトのSPA出力のままとした
+- サンドボックス内で`npx expo export -p web`のビルド成功、Playwrightでの起動確認(トップ画面・招待コード入力・管理者ログイン画面への遷移)・TypeScriptチェックまでは確認済み
+
+**未確認・残タスク**
+- 実際のSupabaseプロジェクトに対する動作確認(ログイン〜データ提出〜Dropboxアップロードまでの一連の流れ)は未実施。Azusaさんの環境で確認が必要
+- Vercelへの実デプロイ未実施。Azusaさんのターミナルから以下の対応が必要:
+  1. https://vercel.com にGitHubアカウントでログイン → 「Add New...」→「Project」→ このリポジトリ(`anoko-baby/monitor-app`)をImport
+  2. Root Directoryはリポジトリのルートのまま、Framework Presetは自動検出されなければ「Other」を選択(`vercel.json`にビルドコマンド・出力先を設定済みなので通常はそのままで動くはず)
+  3. 「Environment Variables」に`EXPO_PUBLIC_SUPABASE_URL`・`EXPO_PUBLIC_SUPABASE_ANON_KEY`を登録(Supabaseダッシュボード → Settings → API から取得。M9のEAS環境変数と同じ値)
+  4. Deployを実行 → 発行されたURL(`https://xxxxx.vercel.app`)をモニターに共有
+- 大容量動画(仕様書上限2GB)をWeb版でGPS除去する際、ブラウザのメモリに一度全体を読み込む実装になっている。デスクトップブラウザでは通常問題ないが、モバイルブラウザ(特にメモリの少ない端末)では大きい動画で失敗する可能性がある。実機確認で問題が出た場合は分割処理等の追加対応を検討
+- Web版はページの再読み込み(リロード)を挟むとアップロードの再開(resume)ができない(blob: URLがページと共に無効になるため)。ネイティブ版のような「機内モードから復帰しても続きから再開」は期待できない制約として認識しておくこと
 
 ---
 

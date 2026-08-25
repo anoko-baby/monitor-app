@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { getStaffAdminProfileIds, sendPushToProfiles } from '../_shared/push.ts';
 
 // Shopify Webhook `orders/create` 受信(仕様書 v1.8 3.12)。
 // Shopify自体はSupabaseの認証ヘッダーを送れないため、HMAC署名検証を認証として使う
@@ -78,6 +79,12 @@ Deno.serve(async (req: Request) => {
     monitorId = monitor?.id ?? null;
   }
 
+  const { data: existingOrder } = await admin
+    .from('coupon_orders')
+    .select('id')
+    .eq('shopify_order_id', String(order.id))
+    .maybeSingle();
+
   await admin.from('coupon_orders').upsert(
     {
       shopify_order_id: String(order.id),
@@ -95,6 +102,15 @@ Deno.serve(async (req: Request) => {
     },
     { onConflict: 'shopify_order_id' }
   );
+
+  // N11: 新規のクーポン注文検知時のみ管理者/スタッフへ通知(Webhook再送等での重複送信を避ける)
+  if (!existingOrder) {
+    const staffAdminIds = await getStaffAdminProfileIds(admin);
+    await sendPushToProfiles(admin, staffAdminIds, {
+      templateKey: 'n11_coupon_order',
+      vars: { coupon_code: couponCode },
+    });
+  }
 
   return new Response('ok', { status: 200 });
 });
