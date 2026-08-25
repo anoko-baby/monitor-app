@@ -204,7 +204,7 @@ Dropboxのリフレッシュトークンと同じ考え方)。
 
 ---
 
-## M9. TestFlight・限定公開配信+βテスト運用
+## M9. TestFlight・限定公開配信+βテスト運用 🚧準備中(2026-08-25)
 
 - EAS Build設定、Apple Developer / Google Play アカウント確認
 - TestFlightへの配信、Android限定公開への配信
@@ -212,6 +212,29 @@ Dropboxのリフレッシュトークンと同じ考え方)。
 
 **完了条件**
 - 協力モニターがTestFlight経由でアプリをインストールし、ログイン〜データ提出までを実機で一通り完了できる
+
+**準備状況(2026-08-25時点)**
+- Apple Developer Program / Google Play Console: Azusaさん側で登録済み
+- bundle identifier / package name は `com.anoko.monitor`(iOS/Android共通)に決定。`app.json`に設定済み
+- `app.json`: `expo-image-picker`(写真ライブラリ利用許諾文言)・`expo-notifications`(通知アイコン色)のconfig pluginを追加、iOSの`ITSAppUsesNonExemptEncryption: false`も設定済み(暗号化に関する審査質問を回避)
+- `eas.json`を新設(development/preview/production の3プロファイル。productionは`autoIncrement: true`でビルド番号を自動採番)
+- **EASプロジェクト自体は未作成**(`eas login`/`eas init`/`eas build:configure`は今回のセッションでは未実施)。このセッション(GitHub連携のリモート実行環境)にはAzusaさんのExpoアカウントでのログイン手段が無いため、以下は**Azusaさんご自身のPC(ローカルのクローン、またはこのプロジェクト本来のDropbox同期フォルダ)のターミナルから実行**してください:
+  ```
+  npx eas login
+  npx eas init          # 初回のみ。projectIdが払い出され app.json の extra.eas.projectId に自動追記される
+  npx eas build:configure
+  npx eas build --platform ios --profile production
+  npx eas build --platform android --profile production
+  ```
+  ビルド完了後、配信は:
+  ```
+  npx eas submit --platform ios --profile production      # App Store Connect → TestFlight
+  npx eas submit --platform android --profile production  # Google Play Console(アップロード後、Play Console側で内部テスト/非公開テストのトラックに手動で割り当て)
+  ```
+  Android提出時にPlay Consoleのサービスアカウントキー(json)を聞かれた場合は、Google Play Console側でAPIアクセス用のサービスアカウントを作成し、ローカルのファイルパスを指定してください(このやり取りもチャットには値を貼らないこと)。
+- **`extra.eas.projectId`が設定されるまで、M8で実装したPush通知のトークン取得(`lib/push.ts`)は静かにスキップされ続ける**。`eas init`実行後にコードの変更は不要(Expoが`app.json`を自動更新するため)だが、実機でのPush到達確認は`eas init`実施後に行うこと
+- 併せて、M8実装メモに記載した`CRON_SECRET`のvault登録(`select vault.create_secret(...)`+`npx supabase secrets set CRON_SECRET=...`)もまだ未実施。日次通知(N2/N6/N7/N10)・異常検知(N12)を実機で確認する前に済ませておくこと
+- 上記の`eas init`実行後、次のセッションでは`app.json`の差分(`extra.eas.projectId`)を取り込んでから、ビルド後の実機確認・TestFlight配信・Google Play限定公開・βテスト運用手順の作成に進む
 
 ---
 
