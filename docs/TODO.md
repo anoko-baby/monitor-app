@@ -489,7 +489,17 @@ Dropboxアップロードのチャンク処理バグ修正後も、一部のPNG�
 - `dropbox-token` Edge Functionのレスポンスに`rootNamespaceId`を追加し、クライアント(`lib/dropbox.ts`)もアップロード・共有リンク作成の全fetch呼び出しに同ヘッダーを付与するよう変更
 - `dropbox-create-campaign-folders`: `DROPBOX_ROOT_NAMESPACE_ID`が設定されている場合、案件フォルダは名前空間のルート直下(=「モニターデータ」フォルダ直下)に作成するよう変更し、従来の`/anoko_monitor`プレフィックスを省略(「モニターデータ」フォルダ自体がアプリ専用フォルダとして機能するため、その中で二重に`anoko_monitor`フォルダを作る必要が無い)。未設定時は従来どおりのプレフィックス付きパスにフォールバックする後方互換動作
 - migration `20260825000006_fix_dropbox_base_path_prefix.sql`: 切り替え前に作成された既存案件の`dropbox_base_path`から旧`/anoko_monitor`プレフィックスを除去(新しい名前空間ルート基準のパスに揃える)。**要 `npx supabase db push`**
-- 「モニターデータ」フォルダの`shared_folder_id`(= namespace_id)は`14991756083`。**Azusaさんに`npx supabase secrets set DROPBOX_ROOT_NAMESPACE_ID="14991756083"`の実行をお願いする必要あり(未実施)**
+- 「モニターデータ」フォルダの`shared_folder_id`(= namespace_id)は`14991756083`。`npx supabase secrets set DROPBOX_ROOT_NAMESPACE_ID="14991756083"`・`npx supabase db push`ともAzusaさんに実行いただき完了
+- `npx tsc --noEmit`・`npx expo export -p web`とも通過を確認済み
+
+---
+
+## アップロード再試行が壊れたセッションで永久に失敗し続ける不具合を修正(2026-08-25)
+
+Dropbox連携先の切り替え作業中に試行された提出ファイル(`IMG_3753.png`)が、切り替え後も「Dropbox API error (upload_session/finish): 409」で「再試行」を押しても直り続けない状態になっていた。
+
+- 原因: `lib/dropbox.ts`の`uploadFileToDropboxChunked`は、アップロード再開用のセッション情報(`session_id`等)を`resumeKey`(=`{submissionId}:{ファイル名}`)をキーにAsyncStorageへキャッシュしている。このセッションはDropbox連携先の名前空間に紐付いて作られるため、連携先を切り替える前に作られたセッションは切り替え後の名前空間からは無効になる。従来のコードはDropboxからのエラーが「オフセットのズレ」(`correct_offset`)由来でない場合、単に例外を再throwするだけでキャッシュ済みセッション自体は破棄していなかった。そのため「再試行」を押すたびに同じ壊れたセッションを読み込み続け、永久に同じエラーで失敗し続けていた
+- 修正: オフセットのズレで説明できないDropbox APIエラーを検知した場合、そのセッションをキャッシュから破棄するようにした。破棄後の次回の「再試行」では`upload_session/start`からやり直されるため正常に完了する(この不具合を踏んでいたファイルは、修正デプロイ後に「再試行」をもう一度押せば直る)
 - `npx tsc --noEmit`・`npx expo export -p web`とも通過を確認済み
 
 ---
