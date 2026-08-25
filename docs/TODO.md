@@ -435,7 +435,21 @@ TestFlight配信の本稼働までまだ時間がかかるため、モニター�
 - `app/campaign-detail.tsx`/`app/submission-form.tsx`/`app/sns-submission-form.tsx`/`app/announcement-detail.tsx`: それぞれ本体ロジックを`XxxContent({id/taskId/targetId, ...})`という名前付きコンポーネントとして分離してexport(HeroScreenでは包まない、生の中身のみ)。デフォルトエクスポート(ルートとしてアクセスされた場合。通知からの直接遷移など)は、そのContentコンポーネントを自分のHeroScreenで包むだけの薄いラッパーに変更
 - `app/monitor-home.tsx`: `view`という状態(`list` / `campaign` / `submission` / `sns`)を持ち、行タップ時は`router.push`ではなく`setView(...)`でビューを切り替える。HeroScreenは常に1つのまま(ヘッダーの見出し「あなたの案件」・アイコン+名前・フッタータブは固定)で、`view`に応じてシート本体だけを「案件一覧」⇄「案件詳細」⇄「提出フォーム/SNS投稿フォーム」に差し替える。戻るボタン(HeroScreenの`onBack`)は一覧以外のときだけ表示され、押すと1階層戻る(提出フォーム→案件詳細→一覧)
 - `app/announcements.tsx`も同様に`announcement-detail`を埋め込み化(一覧⇄詳細の2階層)
-- **管理者側(admin-campaign-list⇄form、admin-submission-list⇄detail、admin-monitor-list⇄detail、admin-announcement-list⇄form、admin-home⇄各ツール)はまだこの方式に未対応**。同じパターンを適用すれば実装できるが、対象画面数が多いため今回はモニター側のみ先行対応した。管理者側も同様にしてほしい場合は次回対応する
+- 管理者側は当初未対応だったが、後続の対応で同じパターンを適用済み(下記参照)
+
+---
+
+## 管理者側にも「詳細ページでもヘッダー/フッタータブを固定表示」を適用(2026-08-25)
+
+「マージしてよい。その後管理画面も直して欲しい」を受けて、モニター側で導入したマスター・ディテール方式を管理者側の全一覧⇄詳細/フォーム画面にも適用した。パターンはモニター側と同じ: 各詳細/フォーム画面の中身を`XxxContent({...})`という名前付きコンポーネントとして分離し(HeroScreenでは包まない)、デフォルトエクスポートはそのContentを自分のHeroScreenで包むだけの薄いラッパーに変更(通知や直接URLアクセス用のフォールバック)。リスト側は`view`という内部状態を持ち、行タップ/ボタン押下で`setView(...)`により同じHeroScreenの中身だけをリスト⇄詳細/フォームに差し替える。
+
+- `app/admin-home.tsx`: `AdminProductSearchContent`/`AdminWatchedCouponsContent`/`AdminCouponOrdersContent`を埋め込み。「モニターを招待する」だけは主要導線がadmin-monitor-list側にあるため単独ルート遷移のまま
+- `app/admin-monitor-list.tsx`: 「+招待する」→`AdminInviteIssueContent`、行タップ→`AdminMonitorDetailContent`を埋め込み
+- `app/admin-campaign-list.tsx`: 「+新規案件」→`AdminCampaignFormContent`(新規作成モード)、行タップ→同コンポーネント(id指定で編集モード)を埋め込み。`AdminCampaignFormContent`はprefill用のprops名を`initialXxx`にリネームして、フォーム自身のstate名(`shippedAt`等)との衝突を回避。保存完了時は`onSaved`コールバックでリストに戻る(渡されなければ従来どおり`router.replace`)。クーポン注文の「案件化する」(`admin-coupon-orders.tsx`)は引き続き単独ルートへの`router.push`のまま(案件一覧セクションへの遷移になるため意図通り)
+- `app/admin-submission-list.tsx`: 提出行のデータ/SNSタップ→`AdminSubmissionDetailContent`を埋め込み
+- `app/admin-announcement-list.tsx`: 「お知らせを作成・配信する」→`AdminAnnouncementFormContent`を埋め込み。フォーム内の「配信内容を確認する」プレビュー切り替えは、このコンポーネント内で完結させたまま(親のリスト側には新しい`view`状態を追加していない)。送信完了時は`onSaved`でリストに戻る
+
+`npx tsc --noEmit`・`npx expo export -p web`とも通過を確認済み。
 
 ---
 
