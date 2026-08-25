@@ -51,32 +51,36 @@ export default function Index() {
 
   if (checking) {
     return (
-      <Screen className="items-center justify-center">
-        <ActivityIndicator color="#7E8F86" />
+      <Screen>
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color="#7E8F86" />
+        </View>
       </Screen>
     );
   }
 
   return (
-    <Screen className="px-6 justify-center">
-      <Text className="font-heading text-title-lg text-ink mb-2">anoko monitor</Text>
-      <Text className="font-body text-body text-ink-soft mb-12">モニター管理アプリ</Text>
+    <Screen>
+      <View className="flex-1 px-6 justify-center">
+        <Text className="font-heading text-title-lg text-ink mb-2">anoko monitor</Text>
+        <Text className="font-body text-body text-ink-soft mb-12">モニター管理アプリ</Text>
 
-      <View className="mb-3">
-        <AppButton label="招待コードで登録する(初めての方)" onPress={() => router.push('/invite-code')} />
-      </View>
-      <View className="mb-8">
+        <View className="mb-3">
+          <AppButton label="招待コードで登録する(初めての方)" onPress={() => router.push('/invite-code')} />
+        </View>
+        <View className="mb-8">
+          <AppButton
+            label="モニターの方はこちら(ログイン)"
+            variant="secondary"
+            onPress={() => router.push('/monitor-login')}
+          />
+        </View>
         <AppButton
-          label="モニターの方はこちら(ログイン)"
+          label="スタッフ・管理者の方はこちら"
           variant="secondary"
-          onPress={() => router.push('/monitor-login')}
+          onPress={() => router.push('/admin-login')}
         />
       </View>
-      <AppButton
-        label="スタッフ・管理者の方はこちら"
-        variant="secondary"
-        onPress={() => router.push('/admin-login')}
-      />
     </Screen>
   );
 }
