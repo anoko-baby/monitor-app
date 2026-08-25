@@ -333,9 +333,14 @@ TestFlight配信の本稼働までまだ時間がかかるため、モニター�
 
 **このセッションでの残タスク(Azusaさんの環境で実施が必要)**
 1. `npx supabase db push`(migration `20260825000002`の適用。まだの場合、モニター一覧のクエリがエラーになり続ける)
-2. `npx supabase functions deploy invite-register dropbox-create-campaign-folders notify-cron notify-dispatch`(このセッションでの修正を反映)
+2. `npx supabase functions deploy invite-register dropbox-create-campaign-folders notify-cron notify-dispatch dropbox-token`(このセッションでの修正を反映。`dropbox-token`は下記の不具合修正のため追加)
 3. 上記の診断SQLをSQL Editorで実行し、結果を共有(「案件にモニターを紐づけたのに見えない」の原因特定用)
 4. 案件を1件試験作成し、Dropboxに正しくフォルダ(`instagram_handle`名義含む)が作られるか確認
+
+**実機フィードバック(2026-08-25、マージ後の実機確認で発見)**
+- migration適用+マージ後、案件一覧はモニター側で正しく表示されることを確認(データ接続不具合は解消)
+- 画像アップロード時に全ファイルで「Dropboxトークンの取得に失敗しました: Failed to send a request to the Edge Function」エラー。原因は`supabase/functions/dropbox-token/index.ts`が他のクライアント呼び出し系Edge Function(`dropbox-create-campaign-folders`/`invite-register`/`shopify-*`)と違い、CORSヘッダーの付与と`OPTIONS`メソッドへの対応が一切無かったこと。ネイティブ版のfetchはCORS制約を受けないため気づかれなかったが、Web版(ブラウザ)からの呼び出しはPOST前に必ずプリフライト(OPTIONS)が飛び、それが弾かれてブラウザ側で接続自体が失敗する(=「Failed to send a request」)という挙動だった。他の全クライアント呼び出し系Edge Functionと同じCORS対応を追加して修正。**要再デプロイ**(上記2に追加済み)
+- ログイン前トップ画面(`app/index.tsx`)がWeb版で左右paddingが効いておらず、見出しやボタンが画面端まで全幅表示になっていた不具合を修正。原因は`components/Screen.tsx`(`SafeAreaView`)自体に`px-6`等のclassNameを直接渡しても、Web版ではsafe-area-context側が挿入するインラインpaddingに負けてpadding-left/rightが0pxになってしまうこと(react-native-safe-area-contextのWeb実装起因の既知の癖)。他の画面は元々「`Screen`の直下に`<View className="flex-1 px-6 ...">`を置く」パターンで書かれていたため影響を受けていなかったが、`index.tsx`だけ`Screen`に直接paddingを渡していたため発生していた。`index.tsx`を同じパターンに修正し、`Screen`コンポーネント自体も`className`/`style`propを受け付けない作りに変更(同種の不具合の再発防止。コメントで注意書きを追加)
 
 ---
 
