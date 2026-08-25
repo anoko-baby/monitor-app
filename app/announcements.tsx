@@ -5,7 +5,7 @@ import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native
 
 import { BottomTabBar } from '../components/BottomTabBar';
 import { ErrorBanner } from '../components/ErrorBanner';
-import { Screen } from '../components/Screen';
+import { HeroScreen } from '../components/HeroScreen';
 import { supabase } from '../lib/supabase';
 import { monitorTabItems } from '../lib/tabItems';
 
@@ -22,6 +22,7 @@ export default function Announcements() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [unreadAnnouncements, setUnreadAnnouncements] = useState(0);
+  const [activeTab, setActiveTab] = useState<'unread' | 'read'>('unread');
 
   async function load() {
     setLoading(true);
@@ -56,11 +57,21 @@ export default function Announcements() {
     loadUnreadAnnouncements();
   }, []);
 
-  return (
-    <Screen>
-      <View className="flex-1 px-6 pt-6">
-      <Text className="font-heading text-title-lg text-ink mb-6">お知らせ</Text>
+  const visibleRows = rows.filter((r) => (activeTab === 'unread' ? r.isUnread : !r.isUnread));
 
+  return (
+    <View className="flex-1">
+      <HeroScreen
+        title="お知らせ"
+        subtitle={`未読 ${rows.filter((r) => r.isUnread).length}件`}
+        tabs={[
+          { key: 'unread', label: '未読', icon: 'mail-unread-outline', activeIcon: 'mail-unread' },
+          { key: 'read', label: '既読', icon: 'mail-open-outline', activeIcon: 'mail-open' },
+        ]}
+        activeTab={activeTab}
+        onTabChange={(key) => setActiveTab(key as 'unread' | 'read')}
+      >
+      <View className="flex-1 px-6 pt-4">
       {loadError && <ErrorBanner message={loadError} />}
 
       {loading ? (
@@ -68,11 +79,13 @@ export default function Announcements() {
       ) : (
         <FlatList
           style={{ flex: 1 }}
-          data={rows}
+          data={visibleRows}
           keyExtractor={(item) => item.targetId}
           ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: '#E7E1D6' }} />}
           ListEmptyComponent={
-            <Text className="font-body text-caption text-ink-soft">お知らせはまだありません</Text>
+            <Text className="font-body text-caption text-ink-soft">
+              {activeTab === 'unread' ? '未読のお知らせはありません' : '既読のお知らせはありません'}
+            </Text>
           }
           renderItem={({ item }) => (
             <Pressable
@@ -99,8 +112,9 @@ export default function Announcements() {
         />
       )}
       </View>
+      </HeroScreen>
 
       <BottomTabBar items={monitorTabItems(unreadAnnouncements)} />
-    </Screen>
+    </View>
   );
 }

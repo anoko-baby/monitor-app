@@ -20,9 +20,10 @@ type Props = {
   title: string;
   subtitle?: string;
   headerExtra?: ReactNode;
-  tabs: HeroTab[];
-  activeTab: string;
-  onTabChange: (key: string) => void;
+  // 2つ以上あるときだけタブ行を表示する(サブビューの無い画面は見出し+シートのみでよい)
+  tabs?: HeroTab[];
+  activeTab?: string;
+  onTabChange?: (key: string) => void;
   children: ReactNode;
 };
 
@@ -43,34 +44,36 @@ export function HeroScreen({ title, subtitle, headerExtra, tabs, activeTab, onTa
         className="flex-1 bg-bg"
         style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, marginTop: -20, overflow: 'hidden' }}
       >
-        <View className="flex-row border-b border-line px-4">
-          {tabs.map((tab) => {
-            const active = tab.key === activeTab;
-            const iconName = active ? tab.activeIcon ?? tab.icon : tab.icon;
-            return (
-              <Pressable
-                key={tab.key}
-                onPress={() => onTabChange(tab.key)}
-                className="flex-1 items-center pt-4 pb-3"
-                style={{ gap: 4 }}
-              >
-                <Ionicons name={iconName} size={20} color={active ? ACTIVE_COLOR : INACTIVE_COLOR} />
-                <Text className={`text-tiny ${active ? 'font-body-medium text-ink' : 'font-body text-ink-soft'}`}>
-                  {tab.label}
-                </Text>
-                <View
-                  style={{
-                    height: 2,
-                    width: '60%',
-                    marginTop: 2,
-                    borderRadius: 1,
-                    backgroundColor: active ? '#7E8F86' : 'transparent',
-                  }}
-                />
-              </Pressable>
-            );
-          })}
-        </View>
+        {tabs && tabs.length > 1 && (
+          <View className="flex-row border-b border-line px-4">
+            {tabs.map((tab) => {
+              const active = tab.key === activeTab;
+              const iconName = active ? tab.activeIcon ?? tab.icon : tab.icon;
+              return (
+                <Pressable
+                  key={tab.key}
+                  onPress={() => onTabChange?.(tab.key)}
+                  className="flex-1 items-center pt-4 pb-3"
+                  style={{ gap: 4 }}
+                >
+                  <Ionicons name={iconName} size={20} color={active ? ACTIVE_COLOR : INACTIVE_COLOR} />
+                  <Text className={`text-tiny ${active ? 'font-body-medium text-ink' : 'font-body text-ink-soft'}`}>
+                    {tab.label}
+                  </Text>
+                  <View
+                    style={{
+                      height: 2,
+                      width: '60%',
+                      marginTop: 2,
+                      borderRadius: 1,
+                      backgroundColor: active ? '#7E8F86' : 'transparent',
+                    }}
+                  />
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
 
         <View className="flex-1">{children}</View>
       </View>

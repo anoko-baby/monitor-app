@@ -2,9 +2,9 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { BottomTabBar } from '../components/BottomTabBar';
-import { Screen } from '../components/Screen';
-import { ADMIN_TAB_ITEMS } from '../lib/tabItems';
+import { HeroScreen } from '../components/HeroScreen';
 import { supabase } from '../lib/supabase';
+import { ADMIN_TAB_ITEMS } from '../lib/tabItems';
 
 const LINKS: {
   label: string;
@@ -23,28 +23,27 @@ export default function AdminHome() {
   }
 
   return (
-    <Screen>
-      <ScrollView className="flex-1 px-6 pt-6" contentContainerStyle={{ paddingBottom: 24 }}>
-        <View className="flex-row items-center justify-between mb-8">
-          <Text className="font-heading text-title-lg text-ink">ホーム</Text>
-          <Pressable onPress={handleSignOut}>
+    <View className="flex-1">
+      <HeroScreen title="ホーム" subtitle="anoko monitor 管理画面">
+        <ScrollView className="flex-1 px-6 pt-6" contentContainerStyle={{ paddingBottom: 24 }}>
+          <Text className="font-body-medium text-caption text-ink-soft mb-2">その他のメニュー</Text>
+          {LINKS.map((link) => (
+            <Pressable
+              key={link.href}
+              onPress={() => router.push(link.href)}
+              className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2"
+            >
+              <Text className="font-body text-body text-ink">{link.label}</Text>
+            </Pressable>
+          ))}
+
+          <Pressable onPress={handleSignOut} className="items-center mt-10 py-2">
             <Text className="font-body text-caption text-ink-soft">ログアウト</Text>
           </Pressable>
-        </View>
-
-        <Text className="font-body-medium text-caption text-ink-soft mb-2">その他のメニュー</Text>
-        {LINKS.map((link) => (
-          <Pressable
-            key={link.href}
-            onPress={() => router.push(link.href)}
-            className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2"
-          >
-            <Text className="font-body text-body text-ink">{link.label}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+        </ScrollView>
+      </HeroScreen>
 
       <BottomTabBar items={ADMIN_TAB_ITEMS} />
-    </Screen>
+    </View>
   );
 }
