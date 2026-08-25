@@ -6,8 +6,9 @@ import { supabase } from '../lib/supabase';
 
 type MonitorRow = {
   id: string;
-  name: string;
+  name: string | null;
   nickname: string | null;
+  instagram_handle: string | null;
   status: 'invited' | 'active' | 'inactive';
 };
 
@@ -25,7 +26,7 @@ export default function AdminMonitorList() {
     (async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('id, name, nickname, status')
+        .select('id, name, nickname, instagram_handle, status')
         .eq('role', 'monitor')
         .order('created_at', { ascending: false });
       setMonitors(data ?? []);
@@ -56,9 +57,14 @@ export default function AdminMonitorList() {
             className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2 flex-row items-center justify-between"
           >
             <View>
-              <Text className="font-body text-body text-ink">{item.name}</Text>
+              <Text className="font-body text-body text-ink">
+                {item.name ?? (item.instagram_handle ? `@${item.instagram_handle}` : '(未登録)')}
+              </Text>
               {item.nickname && (
                 <Text className="font-body text-caption text-ink-soft">{item.nickname}</Text>
+              )}
+              {item.name && item.instagram_handle && (
+                <Text className="font-body text-caption text-ink-soft">@{item.instagram_handle}</Text>
               )}
             </View>
             <Text className="font-body text-caption text-ink-soft">{STATUS_LABEL[item.status]}</Text>

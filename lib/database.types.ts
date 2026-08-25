@@ -714,9 +714,12 @@ export type Database = {
           deleted_at: string | null
           email: string | null
           id: string
-          name: string
+          instagram_handle: string | null
+          name: string | null
           nickname: string | null
           notify_push: boolean
+          phone: string | null
+          prefecture: string | null
           push_token: string | null
           role: Database["public"]["Enums"]["profile_role"]
           shopify_customer_id: string | null
@@ -734,9 +737,12 @@ export type Database = {
           deleted_at?: string | null
           email?: string | null
           id?: string
-          name: string
+          instagram_handle?: string | null
+          name?: string | null
           nickname?: string | null
           notify_push?: boolean
+          phone?: string | null
+          prefecture?: string | null
           push_token?: string | null
           role: Database["public"]["Enums"]["profile_role"]
           shopify_customer_id?: string | null
@@ -754,9 +760,12 @@ export type Database = {
           deleted_at?: string | null
           email?: string | null
           id?: string
-          name?: string
+          instagram_handle?: string | null
+          name?: string | null
           nickname?: string | null
           notify_push?: boolean
+          phone?: string | null
+          prefecture?: string | null
           push_token?: string | null
           role?: Database["public"]["Enums"]["profile_role"]
           shopify_customer_id?: string | null

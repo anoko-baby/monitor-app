@@ -24,7 +24,14 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'method not allowed' }, 405);
   }
 
-  let payload: { code?: string; email?: string; password?: string };
+  let payload: {
+    code?: string;
+    email?: string;
+    password?: string;
+    name?: string;
+    prefecture?: string;
+    phone?: string;
+  };
   try {
     payload = await req.json();
   } catch {
@@ -34,9 +41,12 @@ Deno.serve(async (req: Request) => {
   const code = payload.code?.trim().toUpperCase();
   const email = payload.email?.trim().toLowerCase();
   const password = payload.password;
+  const name = payload.name?.trim();
+  const prefecture = payload.prefecture?.trim();
+  const phone = payload.phone?.trim();
 
-  if (!code || !email || !password) {
-    return jsonResponse({ error: '招待コード・メールアドレス・パスワードを入力してください' }, 400);
+  if (!code || !email || !password || !name || !prefecture || !phone) {
+    return jsonResponse({ error: '招待コード・氏名・都道府県・電話番号・メールアドレス・パスワードを入力してください' }, 400);
   }
   if (password.length < 8) {
     return jsonResponse({ error: 'パスワードは8文字以上で入力してください' }, 400);
@@ -95,7 +105,7 @@ Deno.serve(async (req: Request) => {
 
   const { error: updateError } = await admin
     .from('profiles')
-    .update({ auth_user_id: created.user.id, email })
+    .update({ auth_user_id: created.user.id, email, name, prefecture, phone })
     .eq('id', profile.id);
 
   if (updateError) {

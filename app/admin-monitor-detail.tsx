@@ -10,8 +10,12 @@ import { supabase } from '../lib/supabase';
 
 type MonitorProfile = {
   id: string;
-  name: string;
+  name: string | null;
   nickname: string | null;
+  instagram_handle: string | null;
+  prefecture: string | null;
+  phone: string | null;
+  email: string | null;
   consent_ec: boolean;
   consent_sns: boolean;
   consent_ad: boolean;
@@ -28,7 +32,7 @@ export default function AdminMonitorDetail() {
     (async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('id, name, nickname, consent_ec, consent_sns, consent_ad')
+        .select('id, name, nickname, instagram_handle, prefecture, phone, email, consent_ec, consent_sns, consent_ad')
         .eq('id', id)
         .maybeSingle();
       setProfile(data);
@@ -45,6 +49,9 @@ export default function AdminMonitorDetail() {
       .update({
         name: profile.name,
         nickname: profile.nickname,
+        instagram_handle: profile.instagram_handle,
+        prefecture: profile.prefecture,
+        phone: profile.phone,
         consent_ec: profile.consent_ec,
         consent_sns: profile.consent_sns,
         consent_ad: profile.consent_ad,
@@ -65,15 +72,34 @@ export default function AdminMonitorDetail() {
   return (
     <ScrollView className="flex-1 bg-bg" contentContainerStyle={{ padding: 24 }}>
       <TextField
+        label="Instagramアカウント名"
+        value={profile.instagram_handle ?? ''}
+        onChangeText={(text) => setProfile({ ...profile, instagram_handle: text })}
+        autoCapitalize="none"
+      />
+      <TextField
         label="氏名"
-        value={profile.name}
+        value={profile.name ?? ''}
         onChangeText={(text) => setProfile({ ...profile, name: text })}
+        placeholder={profile.name === null ? '(本登録前)' : undefined}
       />
       <TextField
         label="ニックネーム"
         value={profile.nickname ?? ''}
         onChangeText={(text) => setProfile({ ...profile, nickname: text })}
       />
+      <TextField
+        label="都道府県"
+        value={profile.prefecture ?? ''}
+        onChangeText={(text) => setProfile({ ...profile, prefecture: text })}
+      />
+      <TextField
+        label="電話番号"
+        value={profile.phone ?? ''}
+        onChangeText={(text) => setProfile({ ...profile, phone: text })}
+        keyboardType="phone-pad"
+      />
+      <TextField label="メールアドレス" value={profile.email ?? ''} editable={false} />
 
       <Text className="font-body-medium text-body text-ink mb-2 mt-2">掲載許諾</Text>
       <View className="flex-row items-center justify-between mb-3">

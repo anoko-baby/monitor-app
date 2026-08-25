@@ -7,7 +7,7 @@ import { ErrorBanner } from '../components/ErrorBanner';
 import { TextField } from '../components/TextField';
 import { supabase } from '../lib/supabase';
 
-type MonitorOption = { id: string; name: string; nickname: string | null };
+type MonitorOption = { id: string; name: string | null; nickname: string | null };
 
 // お知らせ作成・配信(仕様書 v1.8 3.9)。Phase1は全モニター/個別選択のみ(タグ・グループ配信はPhase2)。
 // 送信前に対象人数・対象者一覧のプレビューを必ず表示する。

@@ -18,8 +18,7 @@ function generateInviteCode(): string {
 }
 
 export default function AdminInviteIssue() {
-  const [name, setName] = useState('');
-  const [nickname, setNickname] = useState('');
+  const [instagramHandle, setInstagramHandle] = useState('');
   const [issuedCode, setIssuedCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -28,10 +27,10 @@ export default function AdminInviteIssue() {
     setLoading(true);
     setError(null);
 
-    // 3.1.1: 仮登録は氏名・ニックネームのみ(メールはモニター本人が本登録時に設定)
+    // 仮登録はInstagramアカウント名のみ(氏名・都道府県・電話番号・メールはモニター本人が本登録時に入力)
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .insert({ role: 'monitor', name, nickname: nickname || null, status: 'invited' })
+      .insert({ role: 'monitor', instagram_handle: instagramHandle.trim().replace(/^@/, ''), status: 'invited' })
       .select('id')
       .single();
 
@@ -78,15 +77,21 @@ export default function AdminInviteIssue() {
 
   return (
     <View className="flex-1 bg-bg px-6 pt-6">
-      <TextField label="氏名" value={name} onChangeText={setName} />
-      <TextField label="ニックネーム" value={nickname} onChangeText={setNickname} />
+      <TextField
+        label="Instagramアカウント名"
+        value={instagramHandle}
+        onChangeText={setInstagramHandle}
+        autoCapitalize="none"
+        autoCorrect={false}
+        placeholder="anoko_monitor"
+      />
 
       {error && <ErrorBanner message={error} />}
 
       <AppButton
         label={loading ? '発行中…' : '招待コードを発行する'}
         onPress={handleIssue}
-        disabled={!name}
+        disabled={!instagramHandle.trim()}
         loading={loading}
       />
     </View>

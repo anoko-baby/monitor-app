@@ -27,7 +27,11 @@ type ProductSelection = {
   imageUrl: string | null;
 };
 
-type MonitorOption = { id: string; name: string; nickname: string | null };
+type MonitorOption = { id: string; name: string | null; nickname: string | null; instagramHandle: string | null };
+
+function monitorDisplayName(m: MonitorOption): string {
+  return m.name ?? (m.instagramHandle ? `@${m.instagramHandle}(本登録前)` : '(名前未登録)');
+}
 type ChildOption = { id: string; call_name: string };
 type FormFieldMaster = {
   key: string;
@@ -103,6 +107,7 @@ export default function AdminCampaignForm() {
 
   // ---- 共通(編集モードでも使う基本フィールド) ----
   const [title, setTitle] = useState('');
+  const [titleEdited, setTitleEdited] = useState(false);
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [internalMemo, setInternalMemo] = useState('');
   const [shootingGuideline, setShootingGuideline] = useState('');
@@ -167,6 +172,16 @@ export default function AdminCampaignForm() {
     if (selectedMonitor) loadChildren(selectedMonitor.id);
   }, [selectedMonitor?.id]);
 
+  // 案件名の自動サジェスト(仕様書「(モニター名様)」表記)。モニター/商品の選択が変わるたびに追従させる。
+  // 手動で編集した後は上書きしない。
+  useEffect(() => {
+    if (isEdit || titleEdited) return;
+    if (!selectedMonitor || selectedProducts.length === 0) return;
+    const firstProduct = selectedProducts[0];
+    setTitle(suggestCampaignTitle(firstProduct.brand ?? firstProduct.title, monitorDisplayName(selectedMonitor)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMonitor?.name, selectedProducts, titleEdited, isEdit]);
+
   async function loadFormFieldsMaster() {
     const { data } = await supabase
       .from('form_fields')
@@ -183,7 +198,7 @@ export default function AdminCampaignForm() {
     if (params.shippedAt) setShippedAt(params.shippedAt);
     if (params.shipmentOrderNo) setShipmentOrderNo(params.shipmentOrderNo);
     if (params.monitorId && params.monitorName) {
-      setSelectedMonitor({ id: params.monitorId, name: params.monitorName, nickname: null });
+      setSelectedMonitor({ id: params.monitorId, name: params.monitorName, nickname: null, instagramHandle: null });
     }
     if (params.lineItems) {
       try {
@@ -200,9 +215,6 @@ export default function AdminCampaignForm() {
           imageUrl: null,
         }));
         setSelectedProducts(mapped);
-        if (mapped[0] && params.monitorName) {
-          setTitle(suggestCampaignTitle(mapped[0].title, params.monitorName));
-        }
       } catch {
         // prefillの形式が崩れていても新規作成自体は続行できるようにする
       }
@@ -224,11 +236,11 @@ export default function AdminCampaignForm() {
     setMonitorSearching(true);
     const { data } = await supabase
       .from('profiles')
-      .select('id, name, nickname')
+      .select('id, name, nickname, instagram_handle')
       .eq('role', 'monitor')
-      .ilike('name', `%${monitorQuery}%`)
+      .or(`name.ilike.%${monitorQuery}%,instagram_handle.ilike.%${monitorQuery}%`)
       .limit(20);
-    setMonitorResults(data ?? []);
+    setMonitorResults((data ?? []).map((m) => ({ id: m.id, name: m.name, nickname: m.nickname, instagramHandle: m.instagram_handle })));
     setMonitorSearching(false);
     setMonitorSearched(true);
   }
@@ -261,7 +273,12 @@ export default function AdminCampaignForm() {
       setOrderCustomerShopifyId(data.customer.shopifyCustomerId);
     }
     if (data.matchedMonitor) {
-      setSelectedMonitor({ id: data.matchedMonitor.id, name: data.matchedMonitor.name, nickname: null });
+      setSelectedMonitor({
+        id: data.matchedMonitor.id,
+        name: data.matchedMonitor.name,
+        nickname: null,
+        instagramHandle: null,
+      });
     }
 
     const mapped: ProductSelection[] = (data.lineItems ?? []).map((li: any, idx: number) => {
@@ -281,11 +298,6 @@ export default function AdminCampaignForm() {
       };
     });
     setSelectedProducts(mapped);
-
-    const monitorNameForTitle = data.matchedMonitor?.name ?? selectedMonitor?.name ?? data.customer?.name;
-    if (mapped[0] && monitorNameForTitle) {
-      setTitle(suggestCampaignTitle(mapped[0].brand ?? mapped[0].title, monitorNameForTitle));
-    }
   }
 
   function handleProductQueryChange(text: string) {
@@ -809,7 +821,7 @@ export default function AdminCampaignForm() {
       <Text className="font-body-medium text-body text-ink mb-2">モニター</Text>
       {selectedMonitor ? (
         <View className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-4 flex-row items-center justify-between">
-          <Text className="font-body text-body text-ink">{selectedMonitor.name}</Text>
+          <Text className="font-body text-body text-ink">{monitorDisplayName(selectedMonitor)}</Text>
           <Pressable onPress={() => setSelectedMonitor(null)}>
             <Text className="font-body text-caption text-accent-ink">変更</Text>
           </Pressable>
@@ -817,7 +829,7 @@ export default function AdminCampaignForm() {
       ) : (
         <View className="mb-4">
           <TextField
-            label="モニター名で検索"
+            label="モニター名 / Instagramアカウント名で検索"
             value={monitorQuery}
             onChangeText={handleMonitorQueryChange}
             onSubmitEditing={searchMonitors}
@@ -842,7 +854,7 @@ export default function AdminCampaignForm() {
               className="bg-surface rounded-card border-hairline border-line px-4 py-3 mt-2 flex-row items-center justify-between"
             >
               <Text className="font-body text-body text-ink">
-                {m.name}
+                {monitorDisplayName(m)}
                 {m.nickname ? `(${m.nickname})` : ''}
               </Text>
               <Text className="font-body text-caption text-accent-ink">選ぶ ›</Text>
@@ -987,7 +999,14 @@ export default function AdminCampaignForm() {
         <AppButton label="手動で追加する" onPress={addManualProduct} disabled={!manualTitle} variant="secondary" />
       </View>
 
-      <TextField label="案件名" value={title} onChangeText={setTitle} />
+      <TextField
+        label="案件名"
+        value={title}
+        onChangeText={(text) => {
+          setTitle(text);
+          setTitleEdited(true);
+        }}
+      />
 
       <Text className="font-body-medium text-body text-ink mb-2 mt-2">提出期限設定</Text>
       <View className="flex-row mb-3" style={{ gap: 8 }}>
