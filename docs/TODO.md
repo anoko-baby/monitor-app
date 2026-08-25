@@ -396,6 +396,36 @@ TestFlight配信の本稼働までまだ時間がかかるため、モニター�
 
 いずれも既存のクエリ・データ取得ロジックはそのまま(エラーハンドリングも維持)、レイアウトとタブによるクライアント側フィルタリングのみ追加。詳細・フォーム系の画面(admin-campaign-form/admin-submission-detail/admin-monitor-detail/campaign-detail/submission-form等)は従来どおりネイティブヘッダー+戻るボタンの構成のまま(WEARでも一覧系のみこのデザインで、詳細ページは通常のページ遷移になっているため)。
 
+## 詳細・フォーム画面のヒーローデザイン統一、写真削除、プロフィールアイコン、子ども表示(2026-08-25)
+
+「案件の詳細ページ(提出ページ)に飛んだらヘッダーとかがなくなってしまった。どの詳細ページにとんでも、このヘッダーのスタイルは統一したい」への対応として、詳細・フォーム系の画面もすべてHeroScreen構成に統一した(前回の記述は撤回)。
+
+**ヘッダー統一(全12画面)**
+- `components/HeroScreen.tsx`に`onBack`propを追加。指定すると濃色ヘッダーのタイトル左に戻る矢印(‹)を表示する。`lib/navigation.ts`の`goBackOrReplace(fallback)`(履歴があれば戻る、無ければ決まった画面へreplace。旧`components/HeaderBackButton.tsx`のロジックを関数化したもの。旧ファイルは削除)を使う
+- 対象: `campaign-detail`/`submission-form`/`sns-submission-form`/`announcement-detail`(モニター)、`admin-invite-issue`/`admin-monitor-detail`/`admin-product-search`/`admin-watched-coupons`/`admin-coupon-orders`/`admin-campaign-form`/`admin-submission-detail`/`admin-announcement-form`(管理者)
+- `app/_layout.tsx`は該当する全Stack.Screenを`headerShown: false`に変更(ネイティブヘッダーは完全に廃止)
+
+**全ヘッダーへのアイコン+名前表示**
+- `components/HeroProfileBadge.tsx`を新設。ログイン中本人のプロフィール(アイコン画像 or 頭文字丸/ニックネームまたは氏名+「様」)を取得して表示する。フッタータブのある9画面すべての`headerExtra`に配置
+- `profiles.avatar_path`列を追加(migration `20260825000005_profile_avatar.sql`)。公開の`avatars`ストレージバケットを新設し、本人のprofile_id配下のみ書き込み可能に(RLS)。`app/monitor-profile.tsx`にアイコンをタップしてアップロードするUIを追加(プロフィール情報タブの写真+ヘッダーの小さいアイコン、両方から変更可能)
+- `lib/campaigns.ts`に`profileDisplayName`(ニックネーム優先、無ければ`monitorDisplayName`にフォールバック)を追加
+
+**アップロード済み・失敗ファイルの削除**
+- `app/submission-form.tsx`: 提出済みファイルのサムネイルに×ボタン(タスクが確認済みでなければ表示)を追加、`submission_files`から削除。アップロード失敗(エラー)状態のファイルにも「削除」を追加(従来は「再試行」のみで、失敗分が溜まっていく問題があった)
+- migration `20260825000004_submission_files_delete_policy.sql`: モニター本人が自分の`submission_files`を削除できるRLSポリシーを追加(既存は select/insertのみで、実は削除は常にRLSにより無効化されていた)。**要`npx supabase db push`**
+- Dropbox上の実ファイル自体は削除していない(一覧からの削除のみ)。ストレージ容量を厳密に管理する必要が出てきたら別途対応
+
+**子どもの表示形式**
+- `lib/campaigns.ts`に`childDisplayName(callName)`(「そら」→「そらちゃん」)を追加。子ども一覧・提出フォームの子ども選択チップ/カード・管理画面の提出詳細・案件作成時の子ども選択、すべてに適用
+
+**ステータスバーの色**
+- Web版のiOSステータスバー(時刻・電波表示のあたり)がずっと白背景だった件を修正。Expo RouterのWeb静的出力専用機能`app/+html.tsx`はこのプロジェクトのSPA出力モードでは効かない(static出力に切り替えるとSupabaseクライアント初期化がSSRでクラッシュする問題が過去にあったため見送っている)ため、`scripts/patch-web-index-html.js`でビルド後の`dist/index.html`に直接`theme-color`等のmetaタグを追記する方式にした。`vercel.json`のbuildCommandに組み込み済みなので追加設定は不要。iOS Safari 15以降で反映される(それより古いバージョンでは効かない)
+
+**Dropboxアップロードが依然失敗する件(未解決・要確認)**
+- 「画像はやっぱりアップロードできない」「管理ページの提出済み一覧からもDropboxには飛べなくなってる」「トークンの取得に失敗」との報告。コード上は前回のCORS修正(`supabase/functions/dropbox-token/index.ts`へのOPTIONS対応追加)がmainに残っており後退していないことを確認済み。管理画面側の「Dropboxフォルダを開く」も同じ`getDropboxAccessToken()`(`lib/dropbox.ts`)を経由しており、両方が同じ「Failed to send a request to the Edge Function」で失敗しているのは同一原因(CORS未反映)を示唆している
+- 最有力の仮説: `npx supabase functions deploy dropbox-token`を実行した時点のローカル作業フォルダが、修正後のコードを`git pull`していない状態だった(Dropbox同期フォルダでの開発のため、mainへのマージ後にpullし忘れると起こり得る)。デプロイは常にローカルファイルの中身をそのまま送るため、pull前のデプロイは無意味
+- 次回確認すべきこと: ①ローカルで`git log -1 --oneline -- supabase/functions/dropbox-token/index.ts`を実行し、コミット`959ce45`(実機フィードバック対応: Dropboxトークン取得のCORS不具合...)が含まれているか確認 ②`npx supabase functions deploy dropbox-token`を再実行 ③デプロイ後、ブラウザの開発者ツール(またはcurl)でOPTIONSリクエストの応答に`Access-Control-Allow-Origin`ヘッダーが付いているか確認
+
 ---
 
 ## 未確定・要確認事項の記録

@@ -4,10 +4,18 @@ import { ActivityIndicator, Image, Linking, Modal, Pressable, ScrollView, Text, 
 
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroScreen } from '../components/HeroScreen';
 import { TextField } from '../components/TextField';
-import { formatAgeMonths, formatCampaignNo, formatCycleFolderName, monitorDisplayName } from '../lib/campaigns';
+import {
+  childDisplayName,
+  formatAgeMonths,
+  formatCampaignNo,
+  formatCycleFolderName,
+  monitorDisplayName,
+} from '../lib/campaigns';
 import { createDropboxSharedLink } from '../lib/dropbox';
 import { getThumbnailSignedUrl } from '../lib/mediaPipeline';
+import { goBackOrReplace } from '../lib/navigation';
 import { supabase } from '../lib/supabase';
 
 type FileRow = {
@@ -225,7 +233,7 @@ export default function AdminSubmissionDetail() {
             const rowFormData = (r.form_data as Record<string, string>) ?? {};
             return {
               childId: r.child_id,
-              callName: nameById.get(r.child_id) ?? '(不明)',
+              callName: nameById.has(r.child_id) ? childDisplayName(nameById.get(r.child_id)!) : '(不明)',
               ageMonths: r.age_months,
               variantLabels: (variantIdsByScId.get(r.id) ?? []).map((vid) => {
                 const v = variantById.get(vid);
@@ -392,12 +400,12 @@ export default function AdminSubmissionDetail() {
   const canReview = taskStatus === 'submitted';
 
   return (
-    <ScrollView className="flex-1 bg-bg" contentContainerStyle={{ padding: 24 }}>
-      <Text className="font-body text-caption text-ink-soft mb-1">{formatCampaignNo(campaignNo)}</Text>
-      <Text className="font-heading text-title-lg text-ink mb-1">{campaignTitle}</Text>
-      <Text className="font-body text-caption text-ink-soft mb-1">
-        {monitorName} ・ {cycleLabel} ・ {taskType === 'media' ? 'データ提出' : 'SNS投稿'}
-      </Text>
+    <HeroScreen
+      title={campaignTitle}
+      subtitle={`${formatCampaignNo(campaignNo)} ・ ${monitorName} ・ ${cycleLabel} ・ ${taskType === 'media' ? 'データ提出' : 'SNS投稿'}`}
+      onBack={() => goBackOrReplace('/admin-submission-list')}
+    >
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
       <Text className="font-body text-caption text-ink-soft mb-4">
         期限: {taskDueDate} ・ ステータス: {TASK_STATUS_LABEL[taskStatus]}
       </Text>
@@ -542,5 +550,6 @@ export default function AdminSubmissionDetail() {
         </View>
       </Modal>
     </ScrollView>
+    </HeroScreen>
   );
 }

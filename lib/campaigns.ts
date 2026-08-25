@@ -55,6 +55,20 @@ export function computeAgeLabel(birthMonth: string, atDate: string): { months: n
   return { months, label: formatAgeMonths(months) };
 }
 
+// ヘッダー等に表示する本人の呼び名。ニックネームがあれば優先し、無ければmonitorDisplayNameにフォールバックする。
+export function profileDisplayName(p: {
+  name: string | null;
+  nickname: string | null;
+  instagramHandle?: string | null;
+}): string {
+  return p.nickname || monitorDisplayName({ name: p.name, instagramHandle: p.instagramHandle });
+}
+
+// 子どもの呼び名の表示形式(例: そら → そらちゃん)。
+export function childDisplayName(callName: string): string {
+  return `${callName}ちゃん`;
+}
+
 // 今日時点(ローカル日付)のYYYY-MM-DD文字列。
 export function todayDateString(): string {
   const now = new Date();

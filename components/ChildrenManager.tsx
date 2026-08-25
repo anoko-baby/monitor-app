@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { computeAgeLabel, todayDateString } from '../lib/campaigns';
+import { childDisplayName, computeAgeLabel, todayDateString } from '../lib/campaigns';
 import { supabase } from '../lib/supabase';
 import { AppButton } from './AppButton';
 import { CalendarPicker } from './CalendarPicker';
@@ -95,7 +95,7 @@ export function ChildrenManager({ monitorId }: { monitorId: string }) {
           className="flex-row items-center justify-between bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2"
         >
           <View>
-            <Text className="font-body text-body text-ink">{child.call_name}</Text>
+            <Text className="font-body text-body text-ink">{childDisplayName(child.call_name)}</Text>
             <Text className="font-body text-caption text-ink-soft">
               {child.birth_month
                 ? `${child.birth_month.slice(0, 7).replace('-', '年')}月 ・ 現在${

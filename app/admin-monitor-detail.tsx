@@ -5,7 +5,10 @@ import { ActivityIndicator, ScrollView, Switch, Text, View } from 'react-native'
 import { AchievementSection } from '../components/AchievementSection';
 import { AppButton } from '../components/AppButton';
 import { ChildrenManager } from '../components/ChildrenManager';
+import { HeroScreen } from '../components/HeroScreen';
 import { TextField } from '../components/TextField';
+import { profileDisplayName } from '../lib/campaigns';
+import { goBackOrReplace } from '../lib/navigation';
 import { supabase } from '../lib/supabase';
 
 type MonitorProfile = {
@@ -70,7 +73,11 @@ export default function AdminMonitorDetail() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-bg" contentContainerStyle={{ padding: 24 }}>
+    <HeroScreen
+      title={profileDisplayName({ name: profile.name, nickname: profile.nickname, instagramHandle: profile.instagram_handle })}
+      onBack={() => goBackOrReplace('/admin-monitor-list')}
+    >
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
       <TextField
         label="Instagramアカウント名"
         value={profile.instagram_handle ?? ''}
@@ -135,5 +142,6 @@ export default function AdminMonitorDetail() {
 
       <AchievementSection monitorId={profile.id} />
     </ScrollView>
+    </HeroScreen>
   );
 }

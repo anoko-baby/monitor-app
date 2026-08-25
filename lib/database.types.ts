@@ -707,6 +707,7 @@ export type Database = {
       profiles: {
         Row: {
           auth_user_id: string | null
+          avatar_path: string | null
           consent_ad: boolean
           consent_ec: boolean
           consent_sns: boolean
@@ -730,6 +731,7 @@ export type Database = {
         }
         Insert: {
           auth_user_id?: string | null
+          avatar_path?: string | null
           consent_ad?: boolean
           consent_ec?: boolean
           consent_sns?: boolean
@@ -753,6 +755,7 @@ export type Database = {
         }
         Update: {
           auth_user_id?: string | null
+          avatar_path?: string | null
           consent_ad?: boolean
           consent_ec?: boolean
           consent_sns?: boolean

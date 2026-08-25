@@ -4,6 +4,8 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroScreen } from '../components/HeroScreen';
+import { goBackOrReplace } from '../lib/navigation';
 import { supabase } from '../lib/supabase';
 
 type ProductInfo = { title: string; brand: string | null; sku: string | null; size: string | null; color: string | null };
@@ -131,9 +133,8 @@ export default function CampaignDetail() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-bg" contentContainerStyle={{ padding: 24 }}>
-      <Text className="font-heading text-title-lg text-ink mb-4">{campaign.title}</Text>
-
+    <HeroScreen title={campaign.title} onBack={() => goBackOrReplace('/monitor-home')}>
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
       {campaign.products.map((p, index) => (
         <View key={index} className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2">
           <Text className="font-body-medium text-body text-ink">
@@ -210,5 +211,6 @@ export default function CampaignDetail() {
         );
       })}
     </ScrollView>
+    </HeroScreen>
   );
 }

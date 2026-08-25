@@ -4,7 +4,9 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroScreen } from '../components/HeroScreen';
 import { TextField } from '../components/TextField';
+import { goBackOrReplace } from '../lib/navigation';
 import { supabase } from '../lib/supabase';
 
 const MAX_URLS = 5;
@@ -197,12 +199,12 @@ export default function SnsSubmissionForm() {
   const readOnly = taskStatus === 'approved';
 
   return (
-    <ScrollView className="flex-1 bg-bg" contentContainerStyle={{ padding: 24 }}>
-      <Text className="font-heading text-title-lg text-ink mb-1">{campaignTitle}</Text>
-      <Text className="font-body text-caption text-ink-soft mb-4">
-        {cycleLabel} ・ {formatDueDate(taskDueDate)}まで
-      </Text>
-
+    <HeroScreen
+      title={campaignTitle}
+      subtitle={`${cycleLabel} ・ ${formatDueDate(taskDueDate)}まで`}
+      onBack={() => goBackOrReplace('/monitor-home')}
+    >
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
       {taskStatus === 'rejected' && rejectComment && (
         <View className="bg-status-overdue/10 rounded-card p-4 mb-4">
           <Text className="font-body-medium text-caption text-status-overdue mb-1">差し戻されました</Text>
@@ -264,5 +266,6 @@ export default function SnsSubmissionForm() {
         />
       )}
     </ScrollView>
+    </HeroScreen>
   );
 }

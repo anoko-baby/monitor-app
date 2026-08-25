@@ -4,6 +4,7 @@ import { FlatList, Image, Pressable, ScrollView, Switch, Text, View } from 'reac
 
 import { BottomTabBar } from '../components/BottomTabBar';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroProfileBadge } from '../components/HeroProfileBadge';
 import { HeroScreen } from '../components/HeroScreen';
 import { TextField } from '../components/TextField';
 import { formatCampaignNo } from '../lib/campaigns';
@@ -189,6 +190,7 @@ export default function AdminSubmissionList() {
       <HeroScreen
         title="全提出一覧"
         subtitle={`${filtered.length}件`}
+        headerExtra={<HeroProfileBadge />}
         tabs={[
           { key: 'all', label: 'すべて', icon: 'list-outline', activeIcon: 'list' },
           { key: 'media', label: 'データ', icon: 'image-outline', activeIcon: 'image' },

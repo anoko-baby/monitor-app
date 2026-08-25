@@ -7,9 +7,17 @@ import { ActivityIndicator, Image, Platform, Pressable, ScrollView, Text, View }
 import { AppButton } from '../components/AppButton';
 import { CalendarPicker } from '../components/CalendarPicker';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroScreen } from '../components/HeroScreen';
 import { TextField } from '../components/TextField';
-import { computeAgeLabel, formatCycleFolderName, formatSubmissionFileName, todayDateString } from '../lib/campaigns';
+import {
+  childDisplayName,
+  computeAgeLabel,
+  formatCycleFolderName,
+  formatSubmissionFileName,
+  todayDateString,
+} from '../lib/campaigns';
 import { getThumbnailSignedUrl, processAndUploadFile } from '../lib/mediaPipeline';
+import { goBackOrReplace } from '../lib/navigation';
 import { supabase } from '../lib/supabase';
 import { clearDraft, DraftFile, loadDraft, saveDraft } from '../lib/submissionDraft';
 
@@ -446,6 +454,16 @@ export default function SubmissionForm() {
     setPendingFiles((prev) => prev.filter((f) => f.key !== key));
   }
 
+  async function removeExistingFile(fileId: string) {
+    setSubmitError(null);
+    const { error } = await supabase.from('submission_files').delete().eq('id', fileId);
+    if (error) {
+      setSubmitError(`ファイルの削除に失敗しました: ${error.message}`);
+      return;
+    }
+    setExistingFiles((prev) => prev.filter((f) => f.id !== fileId));
+  }
+
   const shotDateField = fieldDefs.find((f) => f.key === 'shot_date');
   const childFieldDefs = fieldDefs.filter((f) => f.key !== 'shot_date' && f.key !== 'age_months');
   const selectedChildren = children.filter((c) => selectedChildIds.includes(c.id));
@@ -466,7 +484,7 @@ export default function SubmissionForm() {
     for (const child of selectedChildren) {
       for (const f of childFieldDefs) {
         if (f.is_required && !childFieldValues[child.id]?.[f.key]) {
-          setSubmitError(`${child.call_name}さんの${f.label}を入力してください`);
+          setSubmitError(`${childDisplayName(child.call_name)}の${f.label}を入力してください`);
           return;
         }
       }
@@ -611,11 +629,12 @@ export default function SubmissionForm() {
   const readOnly = taskStatus === 'approved';
 
   return (
-    <ScrollView className="flex-1 bg-bg" contentContainerStyle={{ padding: 24 }}>
-      <Text className="font-heading text-title-lg text-ink mb-1">{campaignTitle}</Text>
-      <Text className="font-body text-caption text-ink-soft mb-1">
-        {cycleLabel} ・ {formatDueDate(taskDueDate)}まで
-      </Text>
+    <HeroScreen
+      title={campaignTitle}
+      subtitle={`${cycleLabel} ・ ${formatDueDate(taskDueDate)}まで`}
+      onBack={() => goBackOrReplace('/monitor-home')}
+    >
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
       {campaignVariants.length > 0 && (
         <Text className="font-body text-caption text-ink-soft mb-4">
           {campaignVariants.map(variantLabel).join(' , ')}
@@ -647,6 +666,25 @@ export default function SubmissionForm() {
               <View key={f.id} style={{ width: 96, height: 96 }} className="rounded-md overflow-hidden bg-line">
                 {f.signedThumbUrl && (
                   <Image source={{ uri: f.signedThumbUrl }} style={{ width: 96, height: 96 }} />
+                )}
+                {!readOnly && (
+                  <Pressable
+                    onPress={() => removeExistingFile(f.id)}
+                    hitSlop={8}
+                    style={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      width: 22,
+                      height: 22,
+                      borderRadius: 11,
+                      backgroundColor: 'rgba(62,58,52,0.7)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text className="font-body-medium text-tiny text-white">×</Text>
+                  </Pressable>
                 )}
               </View>
             ))}
@@ -683,9 +721,14 @@ export default function SubmissionForm() {
                 </Text>
               </View>
               {f.status === 'error' ? (
-                <Pressable onPress={() => startProcessing(f)}>
-                  <Text className="font-body text-caption text-accent-ink">再試行</Text>
-                </Pressable>
+                <View className="flex-row items-center" style={{ gap: 12 }}>
+                  <Pressable onPress={() => startProcessing(f)}>
+                    <Text className="font-body text-caption text-accent-ink">再試行</Text>
+                  </Pressable>
+                  <Pressable onPress={() => removeFile(f.key)}>
+                    <Text className="font-body text-caption text-status-overdue">削除</Text>
+                  </Pressable>
+                </View>
               ) : f.status !== 'done' ? (
                 <ActivityIndicator color="#7E8F86" />
               ) : (
@@ -730,7 +773,7 @@ export default function SubmissionForm() {
                 }`}
               >
                 <Text className={`font-body text-caption ${selected ? 'text-white' : 'text-ink'}`}>
-                  {child.call_name}
+                  {childDisplayName(child.call_name)}
                 </Text>
               </Pressable>
             );
@@ -745,7 +788,7 @@ export default function SubmissionForm() {
             : null;
         return (
           <View key={child.id} className="bg-surface rounded-card border-hairline border-line p-4 mb-3">
-            <Text className="font-body-medium text-body text-ink mb-1">{child.call_name}</Text>
+            <Text className="font-body-medium text-body text-ink mb-1">{childDisplayName(child.call_name)}</Text>
             <Text className="font-body text-caption text-ink-soft mb-3">
               {ageInfo ? `撮影時点: ${ageInfo.label}` : '撮影日を選択すると年齢が表示されます'}
             </Text>
@@ -828,5 +871,6 @@ export default function SubmissionForm() {
         />
       )}
     </ScrollView>
+    </HeroScreen>
   );
 }

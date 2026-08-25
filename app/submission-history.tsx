@@ -3,6 +3,7 @@ import { FlatList, Image, Text, View } from 'react-native';
 
 import { BottomTabBar } from '../components/BottomTabBar';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { HeroProfileBadge } from '../components/HeroProfileBadge';
 import { HeroScreen } from '../components/HeroScreen';
 import { getThumbnailSignedUrl } from '../lib/mediaPipeline';
 import { supabase } from '../lib/supabase';
@@ -126,6 +127,7 @@ export default function SubmissionHistory() {
       <HeroScreen
         title="提出履歴"
         subtitle={`確認待ち ${rows.filter((r) => r.status !== 'approved').length}件`}
+        headerExtra={<HeroProfileBadge />}
         tabs={[
           { key: 'waiting', label: '確認待ち', icon: 'time-outline', activeIcon: 'time' },
           { key: 'approved', label: '確認済み', icon: 'checkmark-circle-outline', activeIcon: 'checkmark-circle' },

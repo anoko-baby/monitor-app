@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { BottomTabBar } from '../components/BottomTabBar';
+import { HeroProfileBadge } from '../components/HeroProfileBadge';
 import { HeroScreen } from '../components/HeroScreen';
 import { supabase } from '../lib/supabase';
 import { ADMIN_TAB_ITEMS } from '../lib/tabItems';
@@ -24,7 +25,7 @@ export default function AdminHome() {
 
   return (
     <View className="flex-1">
-      <HeroScreen title="ホーム" subtitle="anoko monitor 管理画面">
+      <HeroScreen title="ホーム" subtitle="anoko monitor 管理画面" headerExtra={<HeroProfileBadge />}>
         <ScrollView className="flex-1 px-6 pt-6" contentContainerStyle={{ paddingBottom: 24 }}>
           <Text className="font-body-medium text-caption text-ink-soft mb-2">その他のメニュー</Text>
           {LINKS.map((link) => (
