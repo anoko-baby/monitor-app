@@ -2,6 +2,8 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 
+import { Avatar } from '../components/Avatar';
+import { StatusPill } from '../components/StatusPill';
 import { supabase } from '../lib/supabase';
 
 type MonitorRow = {
@@ -47,29 +49,37 @@ export default function AdminMonitorList() {
       <FlatList
         data={monitors}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 24 }}
+        contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 8 }}
+        ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: '#E7E1D6' }} />}
         ListEmptyComponent={
           <Text className="font-body text-body text-ink-soft">まだモニターがいません</Text>
         }
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => router.push({ pathname: '/admin-monitor-detail', params: { id: item.id } })}
-            className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2 flex-row items-center justify-between"
-          >
-            <View>
-              <Text className="font-body text-body text-ink">
-                {item.name ?? (item.instagram_handle ? `@${item.instagram_handle}` : '(未登録)')}
-              </Text>
-              {item.nickname && (
-                <Text className="font-body text-caption text-ink-soft">{item.nickname}</Text>
-              )}
-              {item.name && item.instagram_handle && (
-                <Text className="font-body text-caption text-ink-soft">@{item.instagram_handle}</Text>
-              )}
-            </View>
-            <Text className="font-body text-caption text-ink-soft">{STATUS_LABEL[item.status]}</Text>
-          </Pressable>
-        )}
+        renderItem={({ item }) => {
+          const displayName = item.name ?? (item.instagram_handle ? `@${item.instagram_handle}` : '(未登録)');
+          return (
+            <Pressable
+              onPress={() => router.push({ pathname: '/admin-monitor-detail', params: { id: item.id } })}
+              className="flex-row items-center py-3"
+              style={{ gap: 12 }}
+            >
+              <Avatar label={displayName} />
+              <View className="flex-1">
+                <Text className="font-body-medium text-body text-ink">{displayName}</Text>
+                {(item.nickname || (item.name && item.instagram_handle)) && (
+                  <Text className="font-body text-caption text-ink-soft" numberOfLines={1}>
+                    {[item.nickname, item.name && item.instagram_handle ? `@${item.instagram_handle}` : null]
+                      .filter(Boolean)
+                      .join(' ・ ')}
+                  </Text>
+                )}
+              </View>
+              <StatusPill
+                label={STATUS_LABEL[item.status]}
+                tone={item.status === 'active' ? 'accent' : item.status === 'invited' ? 'neutral' : 'rejected'}
+              />
+            </Pressable>
+          );
+        }}
       />
     </View>
   );

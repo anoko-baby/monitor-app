@@ -11,6 +11,7 @@
   "dependencies": {
     "@expo-google-fonts/noto-sans-jp": "^0.4.3",
     "@expo-google-fonts/zen-maru-gothic": "^0.4.1",
+    "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.110.2",
     "@xoi/gps-metadata-remover": "^2.0.0",

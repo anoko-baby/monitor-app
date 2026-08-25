@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
@@ -62,15 +63,21 @@ export default function AdminAnnouncementList() {
         <FlatList
           data={rows}
           keyExtractor={(item) => item.id}
+          ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: '#E7E1D6' }} />}
           ListEmptyComponent={
             <Text className="font-body text-caption text-ink-soft">まだ配信したお知らせはありません</Text>
           }
           renderItem={({ item }) => (
-            <View className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2">
-              <Text className="font-body-medium text-body text-ink mb-1">{item.title}</Text>
-              <Text className="font-body text-caption text-ink-soft">
-                {item.sentAt ? item.sentAt.slice(0, 10) : '未配信'} ・ 対象 {item.targetCount}名
-              </Text>
+            <View className="flex-row items-center py-3" style={{ gap: 12 }}>
+              <View className="bg-accent/15 rounded-full items-center justify-center" style={{ width: 40, height: 40 }}>
+                <Ionicons name="megaphone-outline" size={18} color="#4E5B54" />
+              </View>
+              <View className="flex-1">
+                <Text className="font-body-medium text-body text-ink mb-1">{item.title}</Text>
+                <Text className="font-body text-caption text-ink-soft">
+                  {item.sentAt ? item.sentAt.slice(0, 10) : '未配信'} ・ 対象 {item.targetCount}名
+                </Text>
+              </View>
             </View>
           )}
         />

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router, usePathname } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -5,8 +6,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export type TabItem = {
   label: string;
   href: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  activeIcon?: keyof typeof Ionicons.glyphMap;
   badge?: number;
 };
+
+const ACTIVE_COLOR = '#3E3A34'; // ink
+const INACTIVE_COLOR = '#8C8579'; // ink-soft
 
 // 主要画面(ホーム画面)専用のフッター固定タブメニュー。詳細・フォーム画面は従来どおり
 // ネイティブヘッダー+戻るボタンのプッシュ遷移(WEAR等の一般的なアプリと同じ構成)。
@@ -26,6 +32,7 @@ export function BottomTabBar({ items }: { items: TabItem[] }) {
     >
       {items.map((item) => {
         const active = pathname === item.href;
+        const iconName = active ? item.activeIcon ?? item.icon : item.icon;
         return (
           <Pressable
             key={item.href}
@@ -36,22 +43,19 @@ export function BottomTabBar({ items }: { items: TabItem[] }) {
             style={{ gap: 2 }}
           >
             <View>
-              <Text
-                className={`font-body-medium text-caption ${active ? 'text-accent-ink' : 'text-ink-soft'}`}
-              >
-                {item.label}
-              </Text>
+              <Ionicons name={iconName} size={22} color={active ? ACTIVE_COLOR : INACTIVE_COLOR} />
               {!!item.badge && (
                 <View
                   className="bg-status-overdue rounded-full"
-                  style={{ position: 'absolute', top: -2, right: -8, width: 6, height: 6 }}
+                  style={{ position: 'absolute', top: -2, right: -6, width: 8, height: 8 }}
                 />
               )}
             </View>
-            <View
-              className={active ? 'bg-accent' : 'bg-transparent'}
-              style={{ width: 16, height: 2, borderRadius: 1 }}
-            />
+            <Text
+              className={`text-tiny ${active ? 'font-body-medium text-ink' : 'font-body text-ink-soft'}`}
+            >
+              {item.label}
+            </Text>
           </Pressable>
         );
       })}
