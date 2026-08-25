@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Switch, Text, View } from 'react-native';
+import { Platform, ScrollView, Switch, Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
@@ -17,12 +17,13 @@ export default function Consent() {
 
   // 3.8: モニターは初回登録時に通知許可を必須ステップとして求める。
   // OSで「許可しない」を選ばれた場合はブロックできないため、バナーで有効化を促すのみ。
+  // Web版はWeb Push未整備のため、許可リクエスト自体を行わずnotify_push=falseとして進める。
   async function handleAgree() {
     setSubmitting(true);
 
-    const { status } = await Notifications.requestPermissionsAsync();
-    const granted = status === 'granted';
-    setNotifDenied(!granted);
+    const granted =
+      Platform.OS === 'web' ? false : (await Notifications.requestPermissionsAsync()).status === 'granted';
+    setNotifDenied(Platform.OS !== 'web' && !granted);
 
     const {
       data: { session },

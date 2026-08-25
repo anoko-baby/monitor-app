@@ -1,11 +1,15 @@
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 
 import { supabase } from './supabase';
 
 // 通知許可済みのログイン中ユーザーのExpo Push Tokenを取得し、profiles.push_tokenへ保存する(仕様書 v1.8 3.8)。
 // EAS projectId未設定の間(M9でのEASビルド設定前)はトークンが取得できないため、静かにスキップする。
+// Web版はWeb Push用のservice worker/VAPID設定が未整備のため、常にスキップする。
 export async function registerPushTokenForCurrentUser(): Promise<boolean> {
+  if (Platform.OS === 'web') return false;
+
   const permission = await Notifications.getPermissionsAsync();
   if (permission.status !== 'granted') return false;
 

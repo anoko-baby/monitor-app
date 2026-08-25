@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
+import { Platform } from 'react-native';
 
 import { supabase } from './supabase';
 
@@ -101,6 +102,30 @@ async function callDropboxContentFromFile(
   return JSON.parse(result.body);
 }
 
+// Web版: ブラウザのfetchはBlobボディに対応しているため、一時ファイルを介さず直接送信できる。
+async function callDropboxContentFromBlob(
+  endpoint: 'upload_session/start' | 'upload_session/append_v2' | 'upload_session/finish',
+  accessToken: string,
+  apiArg: unknown,
+  chunkBlob: Blob
+): Promise<any> {
+  const response = await fetch(`https://content.dropboxapi.com/2/files/${endpoint}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/octet-stream',
+      'Dropbox-API-Arg': JSON.stringify(apiArg),
+    },
+    body: chunkBlob,
+  });
+
+  const bodyText = await response.text();
+  if (!response.ok) {
+    throw new DropboxApiError(`Dropbox API error (${endpoint}): ${response.status}`, bodyText);
+  }
+  return JSON.parse(bodyText);
+}
+
 // append_v2/finish で offset がずれていた場合、Dropboxはエラー本文に正しいoffsetを返す。
 // リトライ時にそれへ同期させることで、二重送信や取り残しを防ぐ。
 function parseCorrectOffset(errorBody: string): number | null {
@@ -125,11 +150,19 @@ export async function uploadFileToDropboxChunked({
   resumeKey: string;
   onProgress?: (progress: UploadProgress) => void;
 }): Promise<{ path: string }> {
-  const info = await FileSystem.getInfoAsync(fileUri);
-  if (!info.exists) {
-    throw new Error('ファイルが見つかりませんでした');
+  const isWeb = Platform.OS === 'web';
+
+  // Web版: fileUriはブラウザのblob: URL。fetchでBlobとして取得し、以降はslice()でチャンク分割する
+  // (expo-file-systemはWebで未対応のため、native版のような一時ファイル書き出しは不要かつ不可能)。
+  const webBlob = isWeb ? await fetch(fileUri).then((r) => r.blob()) : null;
+
+  let totalSize = 0;
+  if (isWeb) {
+    totalSize = webBlob!.size;
+  } else {
+    const info = await FileSystem.getInfoAsync(fileUri);
+    totalSize = info.exists ? info.size : 0;
   }
-  const totalSize = info.size ?? 0;
   if (totalSize <= 0) {
     throw new Error('ファイルサイズを取得できませんでした');
   }
@@ -138,55 +171,61 @@ export async function uploadFileToDropboxChunked({
 
   let session: UploadSessionState | null = await loadSession(resumeKey);
 
-  if (!session) {
-    const firstLength = Math.min(CHUNK_SIZE, totalSize);
-    const chunkUri = await writeChunkToTempFile(fileUri, 0, firstLength);
+  async function sendChunk(
+    endpoint: 'upload_session/start' | 'upload_session/append_v2' | 'upload_session/finish',
+    apiArg: unknown,
+    position: number,
+    length: number
+  ): Promise<any> {
+    if (isWeb) {
+      return callDropboxContentFromBlob(endpoint, accessToken, apiArg, webBlob!.slice(position, position + length));
+    }
+    const chunkUri = await writeChunkToTempFile(fileUri, position, length);
     try {
-      const startResult = await callDropboxContentFromFile(
-        'upload_session/start',
-        accessToken,
-        { close: false },
-        chunkUri
-      );
-      session = {
-        sessionId: startResult.session_id,
-        offset: firstLength,
-        totalSize,
-        destPath,
-      };
-      await saveSession(resumeKey, session);
-      onProgress?.({ bytesUploaded: session.offset, totalBytes: totalSize });
+      return await callDropboxContentFromFile(endpoint, accessToken, apiArg, chunkUri);
     } finally {
       await FileSystem.deleteAsync(chunkUri, { idempotent: true });
     }
+  }
+
+  if (!session) {
+    const firstLength = Math.min(CHUNK_SIZE, totalSize);
+    const startResult = await sendChunk('upload_session/start', { close: false }, 0, firstLength);
+    session = {
+      sessionId: startResult.session_id,
+      offset: firstLength,
+      totalSize,
+      destPath,
+    };
+    await saveSession(resumeKey, session);
+    onProgress?.({ bytesUploaded: session.offset, totalBytes: totalSize });
   }
 
   while (session.offset < session.totalSize) {
     const remaining: number = session.totalSize - session.offset;
     const isLast: boolean = remaining <= CHUNK_SIZE;
     const length: number = Math.min(CHUNK_SIZE, remaining);
-    const chunkUri = await writeChunkToTempFile(fileUri, session.offset, length);
 
     try {
       if (!isLast) {
-        await callDropboxContentFromFile(
+        await sendChunk(
           'upload_session/append_v2',
-          accessToken,
           { cursor: { session_id: session.sessionId, offset: session.offset }, close: false },
-          chunkUri
+          session.offset,
+          length
         );
         session = { ...session, offset: session.offset + length };
         await saveSession(resumeKey, session);
         onProgress?.({ bytesUploaded: session.offset, totalBytes: session.totalSize });
       } else {
-        const finishResult = await callDropboxContentFromFile(
+        const finishResult = await sendChunk(
           'upload_session/finish',
-          accessToken,
           {
             cursor: { session_id: session.sessionId, offset: session.offset },
             commit: { path: session.destPath, mode: 'add', autorename: true },
           },
-          chunkUri
+          session.offset,
+          length
         );
         await clearSessionInternal(resumeKey);
         onProgress?.({ bytesUploaded: session.totalSize, totalBytes: session.totalSize });
@@ -202,8 +241,6 @@ export async function uploadFileToDropboxChunked({
         }
       }
       throw err;
-    } finally {
-      await FileSystem.deleteAsync(chunkUri, { idempotent: true });
     }
   }
 

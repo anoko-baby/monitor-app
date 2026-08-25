@@ -1,10 +1,13 @@
 import { removeLocation } from '@xoi/gps-metadata-remover';
 import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import { Platform } from 'react-native';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 
 import { createDropboxSharedLink, uploadFileToDropboxChunked, UploadProgress } from './dropbox';
 import { supabase } from './supabase';
+
+const isWeb = Platform.OS === 'web';
 
 // 提出ファイル1件分の処理: HEIC→JPEG変換(無劣化狙い) → サムネイル生成・保存 → GPS位置情報除去
 // (バイト単位の書き換えのみ・再エンコードなし) → Dropboxへアップロード(仕様書 v1.8 3.4.1, 6.2, 6.3)。
@@ -24,7 +27,8 @@ export type ProcessedFileResult = {
   kind: 'photo' | 'video';
   dropboxPath: string;
   dropboxSharedUrl: string;
-  thumbnailPath: string;
+  // Web版はHEIC画像など、ブラウザがデコードできない形式でサムネイル生成に失敗することがあるため null を許容する
+  thumbnailPath: string | null;
   fileSize: number;
   durationSec: number | null;
   originalFilename: string;
@@ -67,7 +71,28 @@ function asciiToBytes(value: string): Uint8Array {
 }
 
 // GPSタグのみをバイト単位でゼロ埋めする(再エンコードなし)。JPEG/PNG/TIFF/MOV/MP4に対応。
-async function stripGpsMetadata(fileUri: string): Promise<void> {
+// ネイティブでは対象ファイルをその場で書き換える(戻り値は元と同じURI)。
+// Web版はexpo-file-systemのFile/FileHandleが未対応のため、blob: URLの中身をメモリ上の
+// Uint8Arrayとして読み書きし、処理後に新しいBlob/blob: URLを作って返す(呼び出し元は
+// 戻り値のURIを以後の処理で使うこと)。
+async function stripGpsMetadata(fileUri: string): Promise<string> {
+  if (isWeb) {
+    const blob = await fetch(fileUri).then((r) => r.blob());
+    const buffer = new Uint8Array(await blob.arrayBuffer());
+
+    const read = async (size: number, offset: number): Promise<ArrayBuffer> => {
+      return buffer.buffer.slice(offset, offset + size);
+    };
+    const write = async (value: string, offset: number, encoding: string): Promise<void> => {
+      const bytes = encoding === 'base64' ? base64ToBytes(value) : asciiToBytes(value);
+      buffer.set(bytes, offset);
+    };
+    await removeLocation(fileUri, read, write);
+
+    const newBlob = new Blob([buffer], { type: blob.type });
+    return URL.createObjectURL(newBlob);
+  }
+
   const file = new File(fileUri);
   const handle = file.open();
   try {
@@ -82,6 +107,7 @@ async function stripGpsMetadata(fileUri: string): Promise<void> {
       handle.writeBytes(bytes);
     };
     await removeLocation(fileUri, read, write);
+    return fileUri;
   } finally {
     handle.close();
   }
@@ -89,10 +115,17 @@ async function stripGpsMetadata(fileUri: string): Promise<void> {
 
 // HEICは選択時にJPEGへ変換してからGPS除去する(HEICのまま無劣化でGPSのみ除去する手段が無いため。
 // Azusaさんと合意した方針)。compress:1・リサイズなしで実質的な画質劣化は生じない。
+// Web版はブラウザ(Safari以外)がHEICをデコードできないことが多く、変換に失敗する場合がある。
+// その場合は元のHEICファイルのまま後続処理(GPS除去・アップロード)を続行する(サムネイルは生成できない)。
 async function convertHeicToJpeg(uri: string): Promise<string> {
-  const image = await ImageManipulator.manipulate(uri).renderAsync();
-  const result = await image.saveAsync({ format: SaveFormat.JPEG, compress: 1 });
-  return result.uri;
+  try {
+    const image = await ImageManipulator.manipulate(uri).renderAsync();
+    const result = await image.saveAsync({ format: SaveFormat.JPEG, compress: 1 });
+    return result.uri;
+  } catch (err) {
+    if (isWeb) return uri;
+    throw err;
+  }
 }
 
 // サムネイルは長辺400pxのJPEG(仕様書 v1.8 6.3)。アップロードする本体とは別の派生ファイルなので再圧縮してよい。
@@ -111,15 +144,55 @@ async function generatePhotoThumbnail(
 }
 
 // 動画のサムネイルは先頭1秒のフレーム画像(仕様書 v1.8 6.3)。
+// expo-video-thumbnailsはWeb未対応のため、Web版は<video>+<canvas>で自前にフレームを取り出す。
 async function generateVideoThumbnail(uri: string): Promise<string> {
+  if (isWeb) {
+    const { uri: frameUri, width, height } = await captureVideoFrameOnWeb(uri, 1);
+    return generatePhotoThumbnail(frameUri, width, height);
+  }
   const frame = await VideoThumbnails.getThumbnailAsync(uri, { time: 1000, quality: 0.8 });
   return generatePhotoThumbnail(frame.uri, frame.width, frame.height);
 }
 
+function captureVideoFrameOnWeb(
+  uri: string,
+  atSeconds: number
+): Promise<{ uri: string; width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+    video.src = uri;
+
+    video.onloadedmetadata = () => {
+      video.currentTime = Math.min(atSeconds, Math.max(video.duration - 0.1, 0));
+    };
+    video.onseeked = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('動画フレームの取得に失敗しました'));
+        return;
+      }
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('動画フレームの取得に失敗しました'));
+          return;
+        }
+        resolve({ uri: URL.createObjectURL(blob), width: canvas.width, height: canvas.height });
+      }, 'image/jpeg');
+    };
+    video.onerror = () => reject(new Error('動画の読み込みに失敗しました'));
+  });
+}
+
 async function uploadThumbnail(localUri: string, storagePath: string): Promise<void> {
-  const file = new File(localUri);
-  const bytes = await file.bytes();
-  const { error } = await supabase.storage.from(THUMBNAILS_BUCKET).upload(storagePath, bytes, {
+  const body = isWeb ? await fetch(localUri).then((r) => r.blob()) : await new File(localUri).bytes();
+  const { error } = await supabase.storage.from(THUMBNAILS_BUCKET).upload(storagePath, body, {
     contentType: 'image/jpeg',
     upsert: true,
   });
@@ -156,15 +229,23 @@ export async function processAndUploadFile({
     workingFileName = workingFileName.replace(HEIC_EXTENSION_RE, '.jpg');
   }
 
-  const thumbnailLocalUri =
-    asset.kind === 'photo'
-      ? await generatePhotoThumbnail(workingUri, asset.width, asset.height)
-      : await generateVideoThumbnail(workingUri);
+  let thumbnailStoragePath: string | null = null;
+  try {
+    const thumbnailLocalUri =
+      asset.kind === 'photo'
+        ? await generatePhotoThumbnail(workingUri, asset.width, asset.height)
+        : await generateVideoThumbnail(workingUri);
 
-  const thumbnailStoragePath = `${submissionId}/${workingFileName.replace(/\.[^.]+$/, '')}_thumb.jpg`;
-  await uploadThumbnail(thumbnailLocalUri, thumbnailStoragePath);
+    thumbnailStoragePath = `${submissionId}/${workingFileName.replace(/\.[^.]+$/, '')}_thumb.jpg`;
+    await uploadThumbnail(thumbnailLocalUri, thumbnailStoragePath);
+  } catch (err) {
+    // Web版はブラウザがデコードできない形式(主にHEIC)でサムネイル生成に失敗することがある。
+    // 本体ファイルの提出自体は継続し、サムネイルなしで進める(ネイティブでは元々発生しない想定なので再throw)。
+    if (!isWeb) throw err;
+    thumbnailStoragePath = null;
+  }
 
-  await stripGpsMetadata(workingUri);
+  workingUri = await stripGpsMetadata(workingUri);
 
   const { path: dropboxPath } = await uploadFileToDropboxChunked({
     fileUri: workingUri,

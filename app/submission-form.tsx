@@ -2,7 +2,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Network from 'expo-network';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
@@ -206,7 +206,8 @@ export default function SubmissionForm() {
         .select('wifi_only_upload')
         .eq('auth_user_id', session.user.id)
         .maybeSingle();
-      setWifiOnly(profile?.wifi_only_upload ?? false);
+      // Web版はブラウザがWi-Fi/モバイル回線を区別できないため、この設定は無視して常にアップロードする
+      setWifiOnly(Platform.OS === 'web' ? false : profile?.wifi_only_upload ?? false);
     }
 
     const { data: submission } = await supabase
@@ -426,7 +427,7 @@ export default function SubmissionForm() {
             kind: f.kind,
             dropbox_path: f.dropboxPath!,
             dropbox_shared_url: f.dropboxSharedUrl!,
-            thumbnail_url: f.thumbnailPath!,
+            thumbnail_url: f.thumbnailPath ?? null,
             file_size: f.fileSize,
             duration_sec: f.durationSec ?? null,
             original_filename: f.originalFilename,
