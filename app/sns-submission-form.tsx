@@ -17,10 +17,9 @@ function formatDueDate(dateStr: string): string {
   return `${parseInt(month, 10)}月${parseInt(day, 10)}日`;
 }
 
-// モニター側 SNS投稿記録フォーム(仕様書 v1.8 画面一覧7, 3.4.3)。投稿URL(最大5件)+任意メモ。
-export default function SnsSubmissionForm() {
-  const { taskId } = useLocalSearchParams<{ taskId: string }>();
-
+// モニター側 SNS投稿記録フォームの本体(仕様書 v1.8 画面一覧7, 3.4.3)。投稿URL(最大5件)+任意メモ。
+// 単独ルートでもmonitor-homeの「あなたの案件」シート内埋め込みでも使う共通コンポーネント。
+export function SnsSubmissionFormContent({ taskId }: { taskId: string }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [taskStatus, setTaskStatus] = useState('pending');
@@ -182,7 +181,7 @@ export default function SnsSubmissionForm() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-bg items-center justify-center">
+      <View className="flex-1 items-center justify-center py-12">
         <ActivityIndicator color="#7E8F86" />
       </View>
     );
@@ -190,7 +189,7 @@ export default function SnsSubmissionForm() {
 
   if (loadError) {
     return (
-      <View className="flex-1 bg-bg px-6 pt-6">
+      <View className="flex-1 px-6 pt-6">
         <ErrorBanner message={loadError} />
       </View>
     );
@@ -199,12 +198,12 @@ export default function SnsSubmissionForm() {
   const readOnly = taskStatus === 'approved';
 
   return (
-    <HeroScreen
-      title={campaignTitle}
-      subtitle={`${cycleLabel} ・ ${formatDueDate(taskDueDate)}まで`}
-      onBack={() => goBackOrReplace('/monitor-home')}
-    >
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
+      <Text className="font-heading text-title text-ink mb-1">{campaignTitle}</Text>
+      <Text className="font-body text-caption text-ink-soft mb-4">
+        {cycleLabel} ・ {formatDueDate(taskDueDate)}まで
+      </Text>
+
       {taskStatus === 'rejected' && rejectComment && (
         <View className="bg-status-overdue/10 rounded-card p-4 mb-4">
           <Text className="font-body-medium text-caption text-status-overdue mb-1">差し戻されました</Text>
@@ -266,6 +265,16 @@ export default function SnsSubmissionForm() {
         />
       )}
     </ScrollView>
+  );
+}
+
+// 単独ルートとしてアクセスされた場合(通知からの直接遷移など)のフォールバック。
+// monitor-homeの「あなたの案件」シートに埋め込まれる場合はSnsSubmissionFormContentを直接使う。
+export default function SnsSubmissionForm() {
+  const { taskId } = useLocalSearchParams<{ taskId: string }>();
+  return (
+    <HeroScreen title="SNS投稿記録" onBack={() => goBackOrReplace('/monitor-home')}>
+      <SnsSubmissionFormContent taskId={taskId} />
     </HeroScreen>
   );
 }

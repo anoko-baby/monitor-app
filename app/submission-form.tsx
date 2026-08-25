@@ -55,11 +55,10 @@ function variantLabel(v: VariantOption): string {
   return [v.color, v.size].filter(Boolean).join(' / ') || v.sku || '(商品)';
 }
 
-// モニター側 データ提出フォーム(仕様書 v1.8 画面一覧6)。ファイル選択+動的フォーム項目+
+// モニター側 データ提出フォームの本体(仕様書 v1.8 画面一覧6)。ファイル選択+動的フォーム項目+
 // 複数の子ども(登録済みchildrenから複数選択)ごとの着用バリエーション/身長体重等/年齢の記録。
-export default function SubmissionForm() {
-  const { taskId } = useLocalSearchParams<{ taskId: string }>();
-
+// 単独ルートでもmonitor-homeの「あなたの案件」シート内埋め込みでも使う共通コンポーネント。
+export function SubmissionFormContent({ taskId }: { taskId: string }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -612,7 +611,7 @@ export default function SubmissionForm() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-bg items-center justify-center">
+      <View className="flex-1 items-center justify-center py-12">
         <ActivityIndicator color="#7E8F86" />
       </View>
     );
@@ -620,7 +619,7 @@ export default function SubmissionForm() {
 
   if (loadError) {
     return (
-      <View className="flex-1 bg-bg px-6 pt-6">
+      <View className="flex-1 px-6 pt-6">
         <ErrorBanner message={loadError} />
       </View>
     );
@@ -629,12 +628,12 @@ export default function SubmissionForm() {
   const readOnly = taskStatus === 'approved';
 
   return (
-    <HeroScreen
-      title={campaignTitle}
-      subtitle={`${cycleLabel} ・ ${formatDueDate(taskDueDate)}まで`}
-      onBack={() => goBackOrReplace('/monitor-home')}
-    >
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
+      <Text className="font-heading text-title text-ink mb-1">{campaignTitle}</Text>
+      <Text className="font-body text-caption text-ink-soft mb-4">
+        {cycleLabel} ・ {formatDueDate(taskDueDate)}まで
+      </Text>
+
       {campaignVariants.length > 0 && (
         <Text className="font-body text-caption text-ink-soft mb-4">
           {campaignVariants.map(variantLabel).join(' , ')}
@@ -871,6 +870,16 @@ export default function SubmissionForm() {
         />
       )}
     </ScrollView>
+  );
+}
+
+// 単独ルートとしてアクセスされた場合(通知からの直接遷移など)のフォールバック。
+// monitor-homeの「あなたの案件」シートに埋め込まれる場合はSubmissionFormContentを直接使う。
+export default function SubmissionForm() {
+  const { taskId } = useLocalSearchParams<{ taskId: string }>();
+  return (
+    <HeroScreen title="提出する" onBack={() => goBackOrReplace('/monitor-home')}>
+      <SubmissionFormContent taskId={taskId} />
     </HeroScreen>
   );
 }

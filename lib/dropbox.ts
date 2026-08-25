@@ -222,10 +222,16 @@ export async function uploadFileToDropboxChunked({
     onProgress?.({ bytesUploaded: session.offset, totalBytes: totalSize });
   }
 
-  while (session.offset < session.totalSize) {
+  // ファイル全体がCHUNK_SIZE以下の場合、start呼び出し1回でoffsetが既にtotalSizeまで進む。
+  // その場合も残りバイト数0でfinishを呼ぶ必要があるため、"offset < totalSize"ではなく
+  // 「finishが成功するまで」をループ条件にする(以前はここが原因でoffset===totalSizeの
+  // ケースがfinishを一度も呼ばずループを抜け、「アップロードが完了しませんでした」に
+  // なっていた)。
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
     const remaining: number = session.totalSize - session.offset;
     const isLast: boolean = remaining <= CHUNK_SIZE;
-    const length: number = Math.min(CHUNK_SIZE, remaining);
+    const length: number = Math.max(0, Math.min(CHUNK_SIZE, remaining));
 
     try {
       if (!isLast) {
@@ -264,8 +270,6 @@ export async function uploadFileToDropboxChunked({
       throw err;
     }
   }
-
-  throw new Error('アップロードが完了しませんでした');
 }
 
 export async function createDropboxSharedLink(path: string): Promise<string> {

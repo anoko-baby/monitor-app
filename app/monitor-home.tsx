@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
@@ -10,6 +9,9 @@ import { HeroScreen } from '../components/HeroScreen';
 import { CycleDotStatus, deriveCycleStatus } from '../lib/campaigns';
 import { supabase } from '../lib/supabase';
 import { monitorTabItems } from '../lib/tabItems';
+import { CampaignDetailContent } from './campaign-detail';
+import { SnsSubmissionFormContent } from './sns-submission-form';
+import { SubmissionFormContent } from './submission-form';
 
 type CampaignRow = {
   id: string;
@@ -19,6 +21,15 @@ type CampaignRow = {
   pendingCount: number;
   cycleStatuses: CycleDotStatus[];
 };
+
+// ホームのシート内でどの画面を表示しているか。ヘッダー(「あなたの案件」+アイコン+タブバー)は
+// 常に据え置きで、この状態に応じてシート本体だけを入れ替える(実機フィードバック: 詳細ページに
+// 飛んでもヘッダーやフッタータブは変わらず、シート領域だけが切り替わるようにしたい、との要望)。
+type SheetView =
+  | { type: 'list' }
+  | { type: 'campaign'; id: string }
+  | { type: 'submission'; taskId: string; campaignId: string }
+  | { type: 'sns'; taskId: string; campaignId: string };
 
 function formatDueDate(dateStr: string): string {
   const [, month, day] = dateStr.split('-');
@@ -32,6 +43,7 @@ export default function MonitorHome() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [unreadAnnouncements, setUnreadAnnouncements] = useState(0);
   const [activeTab, setActiveTab] = useState<'pending' | 'done'>('pending');
+  const [view, setView] = useState<SheetView>({ type: 'list' });
 
   async function load() {
     setLoading(true);
@@ -159,63 +171,94 @@ export default function MonitorHome() {
 
   const visibleCampaigns = campaigns.filter((c) => (activeTab === 'pending' ? c.pendingCount > 0 : c.pendingCount === 0));
 
+  function backToList() {
+    setView({ type: 'list' });
+    load();
+  }
+
+  const onBack =
+    view.type === 'campaign'
+      ? backToList
+      : view.type === 'submission' || view.type === 'sns'
+        ? () => setView({ type: 'campaign', id: view.campaignId })
+        : undefined;
+
   return (
     <View className="flex-1">
       <HeroScreen
         title="あなたの案件"
-        subtitle={`未提出 ${campaigns.filter((c) => c.pendingCount > 0).length}件`}
+        subtitle={view.type === 'list' ? `未提出 ${campaigns.filter((c) => c.pendingCount > 0).length}件` : undefined}
         headerExtra={<HeroProfileBadge />}
-        tabs={[
-          { key: 'pending', label: '未提出', icon: 'time-outline', activeIcon: 'time' },
-          { key: 'done', label: '提出済み', icon: 'checkmark-circle-outline', activeIcon: 'checkmark-circle' },
-        ]}
+        onBack={onBack}
+        tabs={
+          view.type === 'list'
+            ? [
+                { key: 'pending', label: '未提出', icon: 'time-outline', activeIcon: 'time' },
+                { key: 'done', label: '提出済み', icon: 'checkmark-circle-outline', activeIcon: 'checkmark-circle' },
+              ]
+            : undefined
+        }
         activeTab={activeTab}
         onTabChange={(key) => setActiveTab(key as 'pending' | 'done')}
       >
-        <View className="flex-1 px-6 pt-4">
-          {loadError && <ErrorBanner message={loadError} />}
+        {view.type === 'list' && (
+          <View className="flex-1 px-6 pt-4">
+            {loadError && <ErrorBanner message={loadError} />}
 
-          <FlatList
-            style={{ flex: 1 }}
-            data={visibleCampaigns}
-            keyExtractor={(item) => item.id}
-            ListEmptyComponent={
-              !loading ? (
-                <Text className="font-body text-caption text-ink-soft">
-                  {activeTab === 'pending' ? '未提出の案件はありません' : 'まだ提出済みの案件はありません'}
-                </Text>
-              ) : null
-            }
-            renderItem={({ item }) => (
-              <Pressable
-                onPress={() => router.push({ pathname: '/campaign-detail', params: { id: item.id } })}
-                className="bg-surface rounded-card border-hairline border-line px-4 py-4 mb-3"
-              >
-                <Text className="font-body-medium text-body text-ink mb-1">{item.title}</Text>
-                <Text className="font-body text-caption text-ink-soft mb-2">{item.productLabel}</Text>
+            <FlatList
+              style={{ flex: 1 }}
+              data={visibleCampaigns}
+              keyExtractor={(item) => item.id}
+              ListEmptyComponent={
+                !loading ? (
+                  <Text className="font-body text-caption text-ink-soft">
+                    {activeTab === 'pending' ? '未提出の案件はありません' : 'まだ提出済みの案件はありません'}
+                  </Text>
+                ) : null
+              }
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => setView({ type: 'campaign', id: item.id })}
+                  className="bg-surface rounded-card border-hairline border-line px-4 py-4 mb-3"
+                >
+                  <Text className="font-body-medium text-body text-ink mb-1">{item.title}</Text>
+                  <Text className="font-body text-caption text-ink-soft mb-2">{item.productLabel}</Text>
 
-                <View className="flex-row items-center justify-between mb-2">
-                  {item.nextDueDate ? (
-                    <Text className="font-body-medium text-title text-status-overdue">
-                      次の期限: {formatDueDate(item.nextDueDate)}
-                    </Text>
-                  ) : (
-                    <Text className="font-body text-caption text-ink-soft">未提出の項目はありません</Text>
-                  )}
-                  {item.pendingCount > 0 && (
-                    <View className="bg-status-overdue/10 rounded-full px-3 py-1">
-                      <Text className="font-body-medium text-caption text-status-overdue">
-                        未提出 {item.pendingCount}
+                  <View className="flex-row items-center justify-between mb-2">
+                    {item.nextDueDate ? (
+                      <Text className="font-body-medium text-title text-status-overdue">
+                        次の期限: {formatDueDate(item.nextDueDate)}
                       </Text>
-                    </View>
-                  )}
-                </View>
+                    ) : (
+                      <Text className="font-body text-caption text-ink-soft">未提出の項目はありません</Text>
+                    )}
+                    {item.pendingCount > 0 && (
+                      <View className="bg-status-overdue/10 rounded-full px-3 py-1">
+                        <Text className="font-body-medium text-caption text-status-overdue">
+                          未提出 {item.pendingCount}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
 
-                {item.cycleStatuses.length > 0 && <CycleDots statuses={item.cycleStatuses} />}
-              </Pressable>
-            )}
+                  {item.cycleStatuses.length > 0 && <CycleDots statuses={item.cycleStatuses} />}
+                </Pressable>
+              )}
+            />
+          </View>
+        )}
+
+        {view.type === 'campaign' && (
+          <CampaignDetailContent
+            id={view.id}
+            onOpenTask={(taskId, type) =>
+              setView(type === 'media' ? { type: 'submission', taskId, campaignId: view.id } : { type: 'sns', taskId, campaignId: view.id })
+            }
           />
-        </View>
+        )}
+
+        {view.type === 'submission' && <SubmissionFormContent taskId={view.taskId} />}
+        {view.type === 'sns' && <SnsSubmissionFormContent taskId={view.taskId} />}
       </HeroScreen>
 
       <BottomTabBar items={monitorTabItems(unreadAnnouncements)} />

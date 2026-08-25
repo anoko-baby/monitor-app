@@ -15,10 +15,9 @@ type Announcement = {
   sentAt: string | null;
 };
 
-// モニター側お知らせ詳細(仕様書 v1.8 3.9)。開いた時点で既読(read_at)にする。
-export default function AnnouncementDetail() {
-  const { targetId } = useLocalSearchParams<{ targetId: string }>();
-
+// モニター側お知らせ詳細の本体(仕様書 v1.8 3.9)。開いた時点で既読(read_at)にする。
+// 単独ルートでもannouncements.tsxの「お知らせ」シート内埋め込みでも使う共通コンポーネント。
+export function AnnouncementDetailContent({ targetId }: { targetId: string }) {
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -56,7 +55,7 @@ export default function AnnouncementDetail() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-bg items-center justify-center">
+      <View className="flex-1 items-center justify-center py-12">
         <ActivityIndicator color="#7E8F86" />
       </View>
     );
@@ -64,19 +63,18 @@ export default function AnnouncementDetail() {
 
   if (loadError || !announcement) {
     return (
-      <View className="flex-1 bg-bg px-6 pt-6">
+      <View className="flex-1 px-6 pt-6">
         <ErrorBanner message={loadError ?? 'お知らせが見つかりませんでした'} />
       </View>
     );
   }
 
   return (
-    <HeroScreen
-      title={announcement.title}
-      subtitle={announcement.sentAt ? announcement.sentAt.slice(0, 10) : undefined}
-      onBack={() => goBackOrReplace('/announcements')}
-    >
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
+      <Text className="font-heading text-title text-ink mb-1">{announcement.title}</Text>
+      {announcement.sentAt && (
+        <Text className="font-body text-caption text-ink-soft mb-4">{announcement.sentAt.slice(0, 10)}</Text>
+      )}
       <Text className="font-body text-body text-ink mb-6">{announcement.body}</Text>
 
       {announcement.linkUrl && (
@@ -88,6 +86,16 @@ export default function AnnouncementDetail() {
         </Pressable>
       )}
     </ScrollView>
+  );
+}
+
+// 単独ルートとしてアクセスされた場合(通知からの直接遷移など)のフォールバック。
+// announcements.tsxのシートに埋め込まれる場合はAnnouncementDetailContentを直接使う。
+export default function AnnouncementDetail() {
+  const { targetId } = useLocalSearchParams<{ targetId: string }>();
+  return (
+    <HeroScreen title="お知らせ詳細" onBack={() => goBackOrReplace('/announcements')}>
+      <AnnouncementDetailContent targetId={targetId} />
     </HeroScreen>
   );
 }

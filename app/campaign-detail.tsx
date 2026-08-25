@@ -35,9 +35,16 @@ function formatDueDate(dateStr: string): string {
   return `${parseInt(month, 10)}月${parseInt(day, 10)}日`;
 }
 
-// モニター側 案件詳細(仕様書 v1.8 画面一覧5)。商品情報・撮影ガイドライン・回次一覧・到着確認ボタン。
-export default function CampaignDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+// モニター側 案件詳細の本体(仕様書 v1.8 画面一覧5)。商品情報・撮影ガイドライン・回次一覧・到着確認ボタン。
+// 単独ルート(直接アクセス/通知経由)でもmonitor-homeの「あなたの案件」シート内埋め込みでも使う
+// 共通コンポーネント。onOpenTaskの呼び出し方だけ呼び出し元で変える。
+export function CampaignDetailContent({
+  id,
+  onOpenTask,
+}: {
+  id: string;
+  onOpenTask: (taskId: string, type: 'media' | 'sns') => void;
+}) {
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [cycles, setCycles] = useState<CycleRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,6 +114,7 @@ export default function CampaignDetail() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   async function handleMarkDelivered() {
@@ -118,7 +126,7 @@ export default function CampaignDetail() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-bg items-center justify-center">
+      <View className="flex-1 items-center justify-center py-12">
         <ActivityIndicator color="#7E8F86" />
       </View>
     );
@@ -126,15 +134,16 @@ export default function CampaignDetail() {
 
   if (loadError || !campaign) {
     return (
-      <View className="flex-1 bg-bg px-6 pt-6">
+      <View className="flex-1 px-6 pt-6">
         <ErrorBanner message={loadError ?? '案件が見つかりませんでした'} />
       </View>
     );
   }
 
   return (
-    <HeroScreen title={campaign.title} onBack={() => goBackOrReplace('/monitor-home')}>
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
+      <Text className="font-heading text-title text-ink mb-4">{campaign.title}</Text>
+
       {campaign.products.map((p, index) => (
         <View key={index} className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2">
           <Text className="font-body-medium text-body text-ink">
@@ -182,7 +191,7 @@ export default function CampaignDetail() {
 
             {mediaTask && mediaTask.status !== 'cancelled' && (
               <Pressable
-                onPress={() => router.push({ pathname: '/submission-form', params: { taskId: mediaTask.id } })}
+                onPress={() => onOpenTask(mediaTask.id, 'media')}
                 className="flex-row items-center justify-between mb-2"
               >
                 <Text className="font-body text-body text-ink">
@@ -196,7 +205,7 @@ export default function CampaignDetail() {
 
             {snsTask && snsTask.status !== 'cancelled' && (
               <Pressable
-                onPress={() => router.push({ pathname: '/sns-submission-form', params: { taskId: snsTask.id } })}
+                onPress={() => onOpenTask(snsTask.id, 'sns')}
                 className="flex-row items-center justify-between"
               >
                 <Text className="font-body text-body text-ink">
@@ -211,6 +220,21 @@ export default function CampaignDetail() {
         );
       })}
     </ScrollView>
+  );
+}
+
+// 単独ルートとしてアクセスされた場合(通知からの直接遷移など)のフォールバック。
+// monitor-homeの「あなたの案件」シートに埋め込まれる場合はCampaignDetailContentを直接使う。
+export default function CampaignDetail() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  return (
+    <HeroScreen title="案件詳細" onBack={() => goBackOrReplace('/monitor-home')}>
+      <CampaignDetailContent
+        id={id}
+        onOpenTask={(taskId, type) =>
+          router.push({ pathname: type === 'media' ? '/submission-form' : '/sns-submission-form', params: { taskId } })
+        }
+      />
     </HeroScreen>
   );
 }

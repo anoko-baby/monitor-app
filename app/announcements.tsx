@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 
@@ -9,6 +8,7 @@ import { HeroProfileBadge } from '../components/HeroProfileBadge';
 import { HeroScreen } from '../components/HeroScreen';
 import { supabase } from '../lib/supabase';
 import { monitorTabItems } from '../lib/tabItems';
+import { AnnouncementDetailContent } from './announcement-detail';
 
 type AnnouncementRow = {
   targetId: string;
@@ -17,6 +17,8 @@ type AnnouncementRow = {
   isUnread: boolean;
 };
 
+type SheetView = { type: 'list' } | { type: 'detail'; targetId: string };
+
 // モニター側お知らせ一覧(仕様書 v1.8 3.9)。未読バッジ表示。
 export default function Announcements() {
   const [rows, setRows] = useState<AnnouncementRow[]>([]);
@@ -24,6 +26,7 @@ export default function Announcements() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [unreadAnnouncements, setUnreadAnnouncements] = useState(0);
   const [activeTab, setActiveTab] = useState<'unread' | 'read'>('unread');
+  const [view, setView] = useState<SheetView>({ type: 'list' });
 
   async function load() {
     setLoading(true);
@@ -60,19 +63,33 @@ export default function Announcements() {
 
   const visibleRows = rows.filter((r) => (activeTab === 'unread' ? r.isUnread : !r.isUnread));
 
+  function backToList() {
+    setView({ type: 'list' });
+    load();
+    loadUnreadAnnouncements();
+  }
+
   return (
     <View className="flex-1">
       <HeroScreen
         title="お知らせ"
-        subtitle={`未読 ${rows.filter((r) => r.isUnread).length}件`}
+        subtitle={view.type === 'list' ? `未読 ${rows.filter((r) => r.isUnread).length}件` : undefined}
         headerExtra={<HeroProfileBadge />}
-        tabs={[
-          { key: 'unread', label: '未読', icon: 'mail-unread-outline', activeIcon: 'mail-unread' },
-          { key: 'read', label: '既読', icon: 'mail-open-outline', activeIcon: 'mail-open' },
-        ]}
+        onBack={view.type === 'detail' ? backToList : undefined}
+        tabs={
+          view.type === 'list'
+            ? [
+                { key: 'unread', label: '未読', icon: 'mail-unread-outline', activeIcon: 'mail-unread' },
+                { key: 'read', label: '既読', icon: 'mail-open-outline', activeIcon: 'mail-open' },
+              ]
+            : undefined
+        }
         activeTab={activeTab}
         onTabChange={(key) => setActiveTab(key as 'unread' | 'read')}
       >
+      {view.type === 'detail' ? (
+        <AnnouncementDetailContent targetId={view.targetId} />
+      ) : (
       <View className="flex-1 px-6 pt-4">
       {loadError && <ErrorBanner message={loadError} />}
 
@@ -91,7 +108,7 @@ export default function Announcements() {
           }
           renderItem={({ item }) => (
             <Pressable
-              onPress={() => router.push({ pathname: '/announcement-detail', params: { targetId: item.targetId } })}
+              onPress={() => setView({ type: 'detail', targetId: item.targetId })}
               className="flex-row items-center py-3"
               style={{ gap: 12 }}
             >
@@ -114,6 +131,7 @@ export default function Announcements() {
         />
       )}
       </View>
+      )}
       </HeroScreen>
 
       <BottomTabBar items={monitorTabItems(unreadAnnouncements)} />

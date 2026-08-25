@@ -421,10 +421,21 @@ TestFlight配信の本稼働までまだ時間がかかるため、モニター�
 **ステータスバーの色**
 - Web版のiOSステータスバー(時刻・電波表示のあたり)がずっと白背景だった件を修正。Expo RouterのWeb静的出力専用機能`app/+html.tsx`はこのプロジェクトのSPA出力モードでは効かない(static出力に切り替えるとSupabaseクライアント初期化がSSRでクラッシュする問題が過去にあったため見送っている)ため、`scripts/patch-web-index-html.js`でビルド後の`dist/index.html`に直接`theme-color`等のmetaタグを追記する方式にした。`vercel.json`のbuildCommandに組み込み済みなので追加設定は不要。iOS Safari 15以降で反映される(それより古いバージョンでは効かない)
 
-**Dropboxアップロードが依然失敗する件(未解決・要確認)**
-- 「画像はやっぱりアップロードできない」「管理ページの提出済み一覧からもDropboxには飛べなくなってる」「トークンの取得に失敗」との報告。コード上は前回のCORS修正(`supabase/functions/dropbox-token/index.ts`へのOPTIONS対応追加)がmainに残っており後退していないことを確認済み。管理画面側の「Dropboxフォルダを開く」も同じ`getDropboxAccessToken()`(`lib/dropbox.ts`)を経由しており、両方が同じ「Failed to send a request to the Edge Function」で失敗しているのは同一原因(CORS未反映)を示唆している
-- 最有力の仮説: `npx supabase functions deploy dropbox-token`を実行した時点のローカル作業フォルダが、修正後のコードを`git pull`していない状態だった(Dropbox同期フォルダでの開発のため、mainへのマージ後にpullし忘れると起こり得る)。デプロイは常にローカルファイルの中身をそのまま送るため、pull前のデプロイは無意味
-- 次回確認すべきこと: ①ローカルで`git log -1 --oneline -- supabase/functions/dropbox-token/index.ts`を実行し、コミット`959ce45`(実機フィードバック対応: Dropboxトークン取得のCORS不具合...)が含まれているか確認 ②`npx supabase functions deploy dropbox-token`を再実行 ③デプロイ後、ブラウザの開発者ツール(またはcurl)でOPTIONSリクエストの応答に`Access-Control-Allow-Origin`ヘッダーが付いているか確認
+**Dropboxアップロードが依然失敗する件 → 根本原因を特定・修正(2026-08-25)**
+- CORS修正は`curl.exe -i -X OPTIONS`で`Access-Control-Allow-Origin`ヘッダーが実際に返っていることを確認済み(正しくデプロイされていた)。それでもアップロードは「アップロードが完了しませんでした」という別のエラーで失敗し続けていた
+- 真因は`lib/dropbox.ts`の`uploadFileToDropboxChunked`のループ条件`while (session.offset < session.totalSize)`。ファイル全体がCHUNK_SIZE(8MB)以下の場合、`upload_session/start`呼び出し1回で`session.offset`が`totalSize`まで進んでしまい、ループの条件が最初から偽になるため**本文を1度も実行せずループを素通りし、`upload_session/finish`が一度も呼ばれないままフォールスルーしていた**。スマホの写真は大半が8MB以下のため、実質すべての画像アップロードでこの不具合を踏んでいた(動画等8MBを超えるファイルでは通常のチャンク処理を通るため気づかれていなかった)
+- 修正: ループを`while (true)`にし、残りバイト数が0でも`upload_session/finish`を(0バイトの最終チャンクとして)必ず呼ぶように変更。CORS不具合とは全く別の、独立したロジックバグだった
+
+---
+
+## モニター側の「詳細ページでもヘッダー/フッタータブを固定表示」対応(2026-08-25)
+
+「ヘッダーは『あなたの案件』の時の表示のまま、アイコンのタブメニュー(フッター)もそのまま、それより下の領域に詳細ページを表示して、戻って、という表示の仕方にしたい」との要望に対応。expo-routerでの画面遷移(`router.push`)ではなく、**リスト画面自身が内部状態で「今どのビューを表示しているか」を持ち、同じHeroScreen(ヘッダー+フッタータブ)の中身だけを差し替える「マスター・ディテール」方式**に変更した。
+
+- `app/campaign-detail.tsx`/`app/submission-form.tsx`/`app/sns-submission-form.tsx`/`app/announcement-detail.tsx`: それぞれ本体ロジックを`XxxContent({id/taskId/targetId, ...})`という名前付きコンポーネントとして分離してexport(HeroScreenでは包まない、生の中身のみ)。デフォルトエクスポート(ルートとしてアクセスされた場合。通知からの直接遷移など)は、そのContentコンポーネントを自分のHeroScreenで包むだけの薄いラッパーに変更
+- `app/monitor-home.tsx`: `view`という状態(`list` / `campaign` / `submission` / `sns`)を持ち、行タップ時は`router.push`ではなく`setView(...)`でビューを切り替える。HeroScreenは常に1つのまま(ヘッダーの見出し「あなたの案件」・アイコン+名前・フッタータブは固定)で、`view`に応じてシート本体だけを「案件一覧」⇄「案件詳細」⇄「提出フォーム/SNS投稿フォーム」に差し替える。戻るボタン(HeroScreenの`onBack`)は一覧以外のときだけ表示され、押すと1階層戻る(提出フォーム→案件詳細→一覧)
+- `app/announcements.tsx`も同様に`announcement-detail`を埋め込み化(一覧⇄詳細の2階層)
+- **管理者側(admin-campaign-list⇄form、admin-submission-list⇄detail、admin-monitor-list⇄detail、admin-announcement-list⇄form、admin-home⇄各ツール)はまだこの方式に未対応**。同じパターンを適用すれば実装できるが、対象画面数が多いため今回はモニター側のみ先行対応した。管理者側も同様にしてほしい場合は次回対応する
 
 ---
 
