@@ -4,7 +4,7 @@ import { FlatList, Image, Pressable, ScrollView, Switch, Text, View } from 'reac
 
 import { BottomTabBar } from '../components/BottomTabBar';
 import { ErrorBanner } from '../components/ErrorBanner';
-import { Screen } from '../components/Screen';
+import { HeroScreen } from '../components/HeroScreen';
 import { TextField } from '../components/TextField';
 import { formatCampaignNo } from '../lib/campaigns';
 import { getThumbnailSignedUrl } from '../lib/mediaPipeline';
@@ -185,14 +185,23 @@ export default function AdminSubmissionList() {
   }
 
   return (
-    <Screen>
+    <View className="flex-1">
+      <HeroScreen
+        title="全提出一覧"
+        subtitle={`${filtered.length}件`}
+        tabs={[
+          { key: 'all', label: 'すべて', icon: 'list-outline', activeIcon: 'list' },
+          { key: 'media', label: 'データ', icon: 'image-outline', activeIcon: 'image' },
+          { key: 'sns', label: 'SNS', icon: 'at-outline', activeIcon: 'at' },
+        ]}
+        activeTab={taskTypeFilter}
+        onTabChange={(key) => setTaskTypeFilter(key as TaskTypeFilter)}
+      >
       <ScrollView
-        className="px-6 pt-6"
-        style={{ maxHeight: 320 }}
+        className="px-6 pt-4"
+        style={{ maxHeight: 280 }}
         keyboardShouldPersistTaps="handled"
       >
-        <Text className="font-heading text-title-lg text-ink mb-4">全提出一覧</Text>
-
         {loadError && <ErrorBanner message={loadError} />}
 
         <TextField label="キーワード検索(案件番号・案件名・モニター名・商品名)" value={keyword} onChangeText={setKeyword} />
@@ -204,23 +213,6 @@ export default function AdminSubmissionList() {
           <View className="flex-1">
             <TextField label="商品名" value={productFilter} onChangeText={setProductFilter} />
           </View>
-        </View>
-
-        <Text className="font-body text-caption text-ink-soft mb-1">タスク種別</Text>
-        <View className="flex-row mb-3" style={{ gap: 8 }}>
-          {(['all', 'media', 'sns'] as TaskTypeFilter[]).map((v) => (
-            <Pressable
-              key={v}
-              onPress={() => setTaskTypeFilter(v)}
-              className={`rounded-control border px-3 py-2 ${
-                taskTypeFilter === v ? 'border-accent bg-accent' : 'border-line bg-surface'
-              }`}
-            >
-              <Text className={`font-body text-caption ${taskTypeFilter === v ? 'text-white' : 'text-ink'}`}>
-                {v === 'all' ? '全て' : v === 'media' ? 'データ' : 'SNS'}
-              </Text>
-            </Pressable>
-          ))}
         </View>
 
         <Text className="font-body text-caption text-ink-soft mb-1">ステータス</Text>
@@ -321,8 +313,9 @@ export default function AdminSubmissionList() {
           </View>
         )}
       />
+      </HeroScreen>
 
       <BottomTabBar items={ADMIN_TAB_ITEMS} />
-    </Screen>
+    </View>
   );
 }

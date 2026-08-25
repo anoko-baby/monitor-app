@@ -5,7 +5,7 @@ import { FlatList, Pressable, Text, View } from 'react-native';
 import { BottomTabBar } from '../components/BottomTabBar';
 import { CycleDots } from '../components/CycleDots';
 import { ErrorBanner } from '../components/ErrorBanner';
-import { Screen } from '../components/Screen';
+import { HeroScreen } from '../components/HeroScreen';
 import { StatusPill } from '../components/StatusPill';
 import { CycleDotStatus, deriveCycleStatus, formatCampaignNo, monitorDisplayName } from '../lib/campaigns';
 import { supabase } from '../lib/supabase';
@@ -31,6 +31,7 @@ export default function AdminCampaignList() {
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'active' | 'done'>('active');
 
   async function load() {
     setLoading(true);
@@ -81,55 +82,67 @@ export default function AdminCampaignList() {
     load();
   }, []);
 
+  const visibleCampaigns = campaigns.filter((c) => (activeTab === 'active' ? c.status === 'active' : c.status !== 'active'));
+
   return (
-    <Screen>
-      <View className="flex-1 px-6 pt-6">
-      <View className="flex-row items-center justify-between mb-4">
-        <Text className="font-heading text-title-lg text-ink">案件一覧</Text>
-        <Pressable onPress={() => router.push('/admin-campaign-form')}>
-          <Text className="font-body-medium text-body text-accent-ink">+ 新規案件</Text>
-        </Pressable>
-      </View>
+    <View className="flex-1">
+      <HeroScreen
+        title="案件一覧"
+        subtitle={`進行中 ${campaigns.filter((c) => c.status === 'active').length}件`}
+        tabs={[
+          { key: 'active', label: '進行中', icon: 'time-outline', activeIcon: 'time' },
+          { key: 'done', label: '完了・中止', icon: 'checkmark-done-outline', activeIcon: 'checkmark-done' },
+        ]}
+        activeTab={activeTab}
+        onTabChange={(key) => setActiveTab(key as 'active' | 'done')}
+      >
+        <View className="flex-1 px-6 pt-4">
+          <View className="flex-row justify-end mb-2">
+            <Pressable onPress={() => router.push('/admin-campaign-form')}>
+              <Text className="font-body-medium text-body text-accent-ink">+ 新規案件</Text>
+            </Pressable>
+          </View>
 
-      {loadError && <ErrorBanner message={loadError} />}
-      {loading && <Text className="font-body text-caption text-ink-soft">読み込み中…</Text>}
+          {loadError && <ErrorBanner message={loadError} />}
+          {loading && <Text className="font-body text-caption text-ink-soft">読み込み中…</Text>}
 
-      <FlatList
-        style={{ flex: 1 }}
-        data={campaigns}
-        keyExtractor={(item) => item.id}
-        ListEmptyComponent={
-          !loading ? (
-            <Text className="font-body text-caption text-ink-soft">まだ案件がありません</Text>
-          ) : null
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() =>
-              router.push({ pathname: '/admin-campaign-form', params: { id: item.id } })
+          <FlatList
+            style={{ flex: 1 }}
+            data={visibleCampaigns}
+            keyExtractor={(item) => item.id}
+            ListEmptyComponent={
+              !loading ? (
+                <Text className="font-body text-caption text-ink-soft">該当する案件がありません</Text>
+              ) : null
             }
-            className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2"
-          >
-            <View className="flex-row items-center justify-between mb-1">
-              <Text className="font-body text-caption text-ink-soft">
-                {formatCampaignNo(item.campaignNo)}
-              </Text>
-              <StatusPill
-                label={STATUS_LABEL[item.status]}
-                tone={item.status === 'active' ? 'accent' : item.status === 'cancelled' ? 'rejected' : 'neutral'}
-              />
-            </View>
-            <Text className="font-body-medium text-body text-ink mb-1">{item.title}</Text>
-            <Text className="font-body text-caption text-ink-soft mb-2">
-              {item.monitorName ?? '(モニター不明)'}
-            </Text>
-            {item.cycleStatuses.length > 0 && <CycleDots statuses={item.cycleStatuses} />}
-          </Pressable>
-        )}
-      />
-      </View>
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() =>
+                  router.push({ pathname: '/admin-campaign-form', params: { id: item.id } })
+                }
+                className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2"
+              >
+                <View className="flex-row items-center justify-between mb-1">
+                  <Text className="font-body text-caption text-ink-soft">
+                    {formatCampaignNo(item.campaignNo)}
+                  </Text>
+                  <StatusPill
+                    label={STATUS_LABEL[item.status]}
+                    tone={item.status === 'active' ? 'accent' : item.status === 'cancelled' ? 'rejected' : 'neutral'}
+                  />
+                </View>
+                <Text className="font-body-medium text-body text-ink mb-1">{item.title}</Text>
+                <Text className="font-body text-caption text-ink-soft mb-2">
+                  {item.monitorName ?? '(モニター不明)'}
+                </Text>
+                {item.cycleStatuses.length > 0 && <CycleDots statuses={item.cycleStatuses} />}
+              </Pressable>
+            )}
+          />
+        </View>
+      </HeroScreen>
 
       <BottomTabBar items={ADMIN_TAB_ITEMS} />
-    </Screen>
+    </View>
   );
 }

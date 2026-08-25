@@ -3,7 +3,7 @@ import { FlatList, Image, Text, View } from 'react-native';
 
 import { BottomTabBar } from '../components/BottomTabBar';
 import { ErrorBanner } from '../components/ErrorBanner';
-import { Screen } from '../components/Screen';
+import { HeroScreen } from '../components/HeroScreen';
 import { getThumbnailSignedUrl } from '../lib/mediaPipeline';
 import { supabase } from '../lib/supabase';
 import { monitorTabItems } from '../lib/tabItems';
@@ -38,6 +38,7 @@ export default function SubmissionHistory() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [unreadAnnouncements, setUnreadAnnouncements] = useState(0);
+  const [activeTab, setActiveTab] = useState<'waiting' | 'approved'>('waiting');
 
   async function load() {
     setLoading(true);
@@ -118,18 +119,29 @@ export default function SubmissionHistory() {
     loadUnreadAnnouncements();
   }, []);
 
+  const visibleRows = rows.filter((r) => (activeTab === 'approved' ? r.status === 'approved' : r.status !== 'approved'));
+
   return (
-    <Screen>
-      <View className="flex-1 px-6 pt-6">
-      <Text className="font-heading text-title-lg text-ink mb-4">提出履歴</Text>
+    <View className="flex-1">
+      <HeroScreen
+        title="提出履歴"
+        subtitle={`確認待ち ${rows.filter((r) => r.status !== 'approved').length}件`}
+        tabs={[
+          { key: 'waiting', label: '確認待ち', icon: 'time-outline', activeIcon: 'time' },
+          { key: 'approved', label: '確認済み', icon: 'checkmark-circle-outline', activeIcon: 'checkmark-circle' },
+        ]}
+        activeTab={activeTab}
+        onTabChange={(key) => setActiveTab(key as 'waiting' | 'approved')}
+      >
+      <View className="flex-1 px-6 pt-4">
       {loadError && <ErrorBanner message={loadError} />}
       <FlatList
         style={{ flex: 1 }}
-        data={rows}
+        data={visibleRows}
         keyExtractor={(item) => item.taskId}
         ListEmptyComponent={
           !loading ? (
-            <Text className="font-body text-caption text-ink-soft">まだ提出はありません</Text>
+            <Text className="font-body text-caption text-ink-soft">該当する提出はありません</Text>
           ) : null
         }
         renderItem={({ item }) => (
@@ -161,8 +173,9 @@ export default function SubmissionHistory() {
         )}
       />
       </View>
+      </HeroScreen>
 
       <BottomTabBar items={monitorTabItems(unreadAnnouncements)} />
-    </Screen>
+    </View>
   );
 }

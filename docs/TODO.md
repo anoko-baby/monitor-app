@@ -342,6 +342,60 @@ TestFlight配信の本稼働までまだ時間がかかるため、モニター�
 - 画像アップロード時に全ファイルで「Dropboxトークンの取得に失敗しました: Failed to send a request to the Edge Function」エラー。原因は`supabase/functions/dropbox-token/index.ts`が他のクライアント呼び出し系Edge Function(`dropbox-create-campaign-folders`/`invite-register`/`shopify-*`)と違い、CORSヘッダーの付与と`OPTIONS`メソッドへの対応が一切無かったこと。ネイティブ版のfetchはCORS制約を受けないため気づかれなかったが、Web版(ブラウザ)からの呼び出しはPOST前に必ずプリフライト(OPTIONS)が飛び、それが弾かれてブラウザ側で接続自体が失敗する(=「Failed to send a request」)という挙動だった。他の全クライアント呼び出し系Edge Functionと同じCORS対応を追加して修正。**要再デプロイ**(上記2に追加済み)
 - ログイン前トップ画面(`app/index.tsx`)がWeb版で左右paddingが効いておらず、見出しやボタンが画面端まで全幅表示になっていた不具合を修正。原因は`components/Screen.tsx`(`SafeAreaView`)自体に`px-6`等のclassNameを直接渡しても、Web版ではsafe-area-context側が挿入するインラインpaddingに負けてpadding-left/rightが0pxになってしまうこと(react-native-safe-area-contextのWeb実装起因の既知の癖)。他の画面は元々「`Screen`の直下に`<View className="flex-1 px-6 ...">`を置く」パターンで書かれていたため影響を受けていなかったが、`index.tsx`だけ`Screen`に直接paddingを渡していたため発生していた。`index.tsx`を同じパターンに修正し、`Screen`コンポーネント自体も`className`/`style`propを受け付けない作りに変更(同種の不具合の再発防止。コメントで注意書きを追加)
 
+## 提出フォームの複数子ども対応・カレンダー入力(2026-08-25)
+
+実機フィードバックを受けて、日付入力のカレンダー化と、1件の提出に対して複数の子どもを紐づけられるようにする対応を実施。方針(1人の子どもに追加項目は個別入力/1人に複数バリエーションもあり得る)はAskUserQuestionでAzusaさんに確認済み。
+
+**データ構造の変更**
+- 新migration `20260825000003_submission_children.sql`: `submission_children`(提出×子ども。子どもごとの`age_months`・`form_data`)、`submission_child_variants`(子ども×バリエーションの多対多。1人が複数色/サイズを着用したケースに対応)を追加。RLSは既存の`submissions`/`submission_files`と同じ「タスクがapproved/cancelledでなければモニター本人が読み書きできる」パターンに揃えた。**要`npx supabase db push`**
+- `lib/database.types.ts`に上記2テーブルの型定義を追加(手動管理のため)
+- 案件ごとに設定する追加項目(身長・体重・足の実寸・フィット感・ひとことメモ)は、これまで提出1件につき共通で1つだった(`submissions.form_data`)のを、子どもごとに別々の値(`submission_children.form_data`)を持つ形に変更。撮影日(`shot_date`)のみ提出全体で共通のため`submissions.form_data`に残した
+- 月齢/年齢(`age_months`)は、これまで案件ごとに任意で設定する項目の1つだった(手入力もできる建て付け)のを廃止し、`submission_children.age_months`として撮影日×子どもの生年月から**常に自動計算・自動保存**する形に変更(手入力欄は表示しない)
+
+**カレンダー入力**
+- `components/CalendarPicker.tsx`を新設。ネイティブモジュールに依存せず(EAS再ビルド不要)、Modal+自前グリッドで年月日/年月選択を実装。`mode="date"`(撮影日など、日まで選択・カレンダーグリッド)と`mode="month"`(子どもの生年月、年+月グリッドのみ)の2種類
+- `app/submission-form.tsx`の撮影日、`components/ChildrenManager.tsx`の生年月をこのカレンダーに置き換え(YYYY-MM-DD/YYYY-MMの手入力を廃止)。撮影日は未来日を選べないようmaxDateを設定
+- `lib/campaigns.ts`に`computeAgeLabel`(生年月+基準日→月齢+「n歳nヶ月」ラベル)・`formatAgeMonths`(月齢の整数値→ラベル)・`todayDateString`を追加(子ども一覧の現在年齢表示、提出フォームの撮影時点年齢表示、管理画面の詳細表示で共有)
+
+**提出フォーム(`app/submission-form.tsx`)の変更**
+- 「対象の子ども(複数選択可)」チップを追加。モニター本人が登録済みの全children(案件のchild_idに限定しない)から複数選択できる。案件にchild_idが設定されていて、かつまだ提出データが無い場合はその子をデフォルト選択しておく
+- 選択した子どもごとにカードを表示: 撮影時点の年齢(自動計算・自動表示)/着用したカラー・サイズ(案件に登録済みのバリエーションから複数選択可)/身長・体重等の追加項目(子どもごとに個別入力)
+- 送信時、`submission_children`・`submission_child_variants`を子ども単位でupsert・差し替え(選択解除された子どもの行は削除)。バリデーションも子どもごとに必須項目をチェックする形に変更
+- 差し戻し再提出・下書き復元(ページリロード時の自動保存)にも対応(`lib/submissionDraft.ts`に`selectedChildIds`/`childFieldValues`/`childVariantIds`を追加)
+
+**管理画面(`app/admin-submission-detail.tsx`)の変更**
+- 「フォーム回答」を廃止し、「子どもごとの提出内容」として子どもの名前・撮影時点の年齢・着用バリエーション・追加項目の値をカードごとに表示するよう変更
+
+**未確認・残タスク**
+- 実際のSupabase環境でのmigration適用(`npx supabase db push`)と、モニター側での動作確認(子ども選択→カラー/サイズ選択→身長体重入力→提出→管理画面で正しく表示されるか)はまだ未実施
+- カレンダーUI(`CalendarPicker`)はサンドボックス内でのビルド確認のみで、実機での操作感(タップ範囲・レスポンスなど)は未確認
+
+## Dropboxアップロード「Load failed」の修正、プロフィール/ホームのWEAR風ヒアデザイン(2026-08-25)
+
+**Dropboxアップロード不具合(実機で継続していた「Load failed」/「Failed to send a request」)**
+- CORS修正後も画像アップロードが失敗し続けていた件を再調査。原因は`lib/mediaPipeline.ts`のGPS除去処理(`stripGpsMetadata`)がWeb版で処理後に新しい`blob:` URLを作成し、それを`lib/dropbox.ts`の`uploadFileToDropboxChunked`が改めて`fetch()`し直していたこと。Safari(WebKit)は`blob:` URLを作成から時間が経つ・他の非同期処理を挟むと`fetch()`が「Load failed」で失敗させることがある既知の挙動があり、これに該当していた
+- 修正: `stripGpsMetadata`が処理済みの`Blob`オブジェクト自体も呼び出し元に返すようにし、`uploadFileToDropboxChunked`はそのBlobを直接受け取れるオプション引数(`webBlob`)を追加。これにより同じblob URLを二度fetchし直す必要が無くなった。あわせて、他に残っているblob URLのfetch箇所(サムネイルアップロード等)にも数回リトライする`fetchBlobWithRetry`ヘルパー(`lib/dropbox.ts`)を導入し、同種の問題への耐性を上げた
+
+**プロフィール/ホーム画面のWEAR風ヒーローデザイン**
+- `components/HeroScreen.tsx`を新設。濃色(ink色)のヘッダー領域の下に角丸の白系シートが被さって出てくるレイアウトで、シート上部にアイコン+ラベルのタブ(選択中のみ塗りつぶしアイコン+下線)を配置できる。WEARアプリのプロフィール/ホーム画面のスクリーンショットを参考に実装(仕様書には無い追加対応)
+- `app/monitor-profile.tsx`: 「プロフィール情報」「子ども情報」の2タブ構成に変更。ヘッダーにアバター(頭文字丸アイコン)+氏名+Instagramアカウント名(@表示)を追加。ログアウトボタンはプロフィール情報タブの最下部のみに配置(ホーム画面など他画面からは撤去)
+- `app/monitor-home.tsx`: 「未提出」「提出済み」の2タブ構成に変更(案件の`pendingCount`で振り分け)。ログアウトボタンを撤去(プロフィール画面に一本化)
+- 管理者側画面・提出詳細/フォーム系画面など、他の画面はまだWEAR風ヒーローデザインに未対応(必要であれば次回以降のセッションで展開する)
+
+## WEAR風ヒーローデザインを管理者側・残りの一覧画面にも展開(2026-08-25)
+
+「管理ページや他のページも今回のwear風デザインを反映させて」の指示を受けて、フッタータブメニューを持つ全画面(=主要画面)を`HeroScreen`構成に統一した。`components/HeroScreen.tsx`はタブが1つ以下のときはタブ行自体を表示しない仕様に変更(自然な区分の無い画面向け)。
+
+- `app/admin-home.tsx`: タブ無し(見出し+シートのみ)。ログアウトボタンをメニュー一覧の下に移動
+- `app/admin-campaign-list.tsx`: 「進行中」「完了・中止」の2タブ(`status`で振り分け)
+- `app/admin-monitor-list.tsx`: 「すべて」「有効」「招待中」「無効」の4タブ(`status`で振り分け)
+- `app/admin-submission-list.tsx`: 既存の「タスク種別」フィルタ(全て/データ/SNS)をHeroScreenのタブ行に統合。ステータス等の他のフィルタはタブの下の折りたたみエリアに残した
+- `app/admin-announcement-list.tsx`: タブ無し(配信は作成と同時に確定するため下書き等の区分が無いため)
+- `app/submission-history.tsx`(モニター): 「確認待ち」「確認済み」の2タブ(タスクステータスで振り分け)
+- `app/announcements.tsx`(モニター): 「未読」「既読」の2タブ
+
+いずれも既存のクエリ・データ取得ロジックはそのまま(エラーハンドリングも維持)、レイアウトとタブによるクライアント側フィルタリングのみ追加。詳細・フォーム系の画面(admin-campaign-form/admin-submission-detail/admin-monitor-detail/campaign-detail/submission-form等)は従来どおりネイティブヘッダー+戻るボタンの構成のまま(WEARでも一覧系のみこのデザインで、詳細ページは通常のページ遷移になっているため)。
+
 ---
 
 ## 未確定・要確認事項の記録

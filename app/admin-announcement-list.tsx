@@ -6,7 +6,7 @@ import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 import { AppButton } from '../components/AppButton';
 import { BottomTabBar } from '../components/BottomTabBar';
 import { ErrorBanner } from '../components/ErrorBanner';
-import { Screen } from '../components/Screen';
+import { HeroScreen } from '../components/HeroScreen';
 import { supabase } from '../lib/supabase';
 import { ADMIN_TAB_ITEMS } from '../lib/tabItems';
 
@@ -58,8 +58,9 @@ export default function AdminAnnouncementList() {
   }, []);
 
   return (
-    <Screen>
-      <View className="flex-1 px-6 pt-6">
+    <View className="flex-1">
+      <HeroScreen title="お知らせ配信" subtitle={`配信済み ${rows.length}件`}>
+      <View className="flex-1 px-6 pt-4">
       <View className="mb-4">
         <AppButton label="お知らせを作成・配信する" onPress={() => router.push('/admin-announcement-form')} />
       </View>
@@ -93,8 +94,9 @@ export default function AdminAnnouncementList() {
         />
       )}
       </View>
+      </HeroScreen>
 
       <BottomTabBar items={ADMIN_TAB_ITEMS} />
-    </Screen>
+    </View>
   );
 }

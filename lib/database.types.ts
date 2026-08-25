@@ -838,6 +838,87 @@ export type Database = {
           },
         ]
       }
+      submission_child_variants: {
+        Row: {
+          created_at: string
+          id: string
+          submission_child_id: string
+          variant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          submission_child_id: string
+          variant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          submission_child_id?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submission_child_variants_submission_child_id_fkey"
+            columns: ["submission_child_id"]
+            isOneToOne: false
+            referencedRelation: "submission_children"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "submission_child_variants_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      submission_children: {
+        Row: {
+          age_months: number | null
+          child_id: string
+          created_at: string
+          form_data: Json
+          id: string
+          submission_id: string
+          updated_at: string
+        }
+        Insert: {
+          age_months?: number | null
+          child_id: string
+          created_at?: string
+          form_data?: Json
+          id?: string
+          submission_id: string
+          updated_at?: string
+        }
+        Update: {
+          age_months?: number | null
+          child_id?: string
+          created_at?: string
+          form_data?: Json
+          id?: string
+          submission_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submission_children_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: false
+            referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "submission_children_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       submission_files: {
         Row: {
           created_at: string

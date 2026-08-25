@@ -29,6 +29,23 @@ class DropboxApiError extends Error {
   }
 }
 
+// Web版のblob: URLはSafari(WebKit)で特に、作成から時間が経つ・他の非同期処理を挟むと
+// fetch()が「Load failed」で失敗することがある(WebKitの既知の挙動)。1回失敗しても
+// すぐ諦めず数回リトライすることで実用上ほぼ回避できる。
+export async function fetchBlobWithRetry(uri: string, retries = 2): Promise<Blob> {
+  let lastErr: unknown;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const response = await fetch(uri);
+      return await response.blob();
+    } catch (err) {
+      lastErr = err;
+      if (i < retries) await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+  }
+  throw new Error(`ファイルの読み込みに失敗しました: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
+}
+
 async function getDropboxAccessToken(): Promise<string> {
   const { data, error } = await supabase.functions.invoke('dropbox-token');
   if (error) {
@@ -144,17 +161,21 @@ export async function uploadFileToDropboxChunked({
   destPath,
   resumeKey,
   onProgress,
+  webBlob: providedWebBlob,
 }: {
   fileUri: string;
   destPath: string;
   resumeKey: string;
   onProgress?: (progress: UploadProgress) => void;
+  // Web版: 呼び出し元が処理済みのBlobを既に保持している場合はこれを直接使う(fileUriの
+  // blob: URLを改めてfetchし直すと、Safariでは既にURLが失効していて失敗することがあるため)。
+  webBlob?: Blob;
 }): Promise<{ path: string }> {
   const isWeb = Platform.OS === 'web';
 
   // Web版: fileUriはブラウザのblob: URL。fetchでBlobとして取得し、以降はslice()でチャンク分割する
   // (expo-file-systemはWebで未対応のため、native版のような一時ファイル書き出しは不要かつ不可能)。
-  const webBlob = isWeb ? await fetch(fileUri).then((r) => r.blob()) : null;
+  const webBlob = isWeb ? providedWebBlob ?? (await fetchBlobWithRetry(fileUri)) : null;
 
   let totalSize = 0;
   if (isWeb) {

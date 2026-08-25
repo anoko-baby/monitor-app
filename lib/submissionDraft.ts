@@ -25,6 +25,9 @@ export type SubmissionDraft = {
   formValues: Record<string, string>;
   files: DraftFile[];
   updatedAt: string;
+  selectedChildIds?: string[];
+  childFieldValues?: Record<string, Record<string, string>>;
+  childVariantIds?: Record<string, string[]>;
 };
 
 export async function saveDraft(taskId: string, draft: SubmissionDraft): Promise<void> {
