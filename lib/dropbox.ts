@@ -46,6 +46,18 @@ export async function fetchBlobWithRetry(uri: string, retries = 2): Promise<Blob
   throw new Error(`ファイルの読み込みに失敗しました: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
 }
 
+// Dropboxの仕様上、Dropbox-API-Argヘッダーの値はASCIIのみ許容される(非ASCII文字は\uXXXX
+// エスケープで表現する必要がある)。回次フォルダ名(「第1回_...」等、常に日本語を含む)や
+// ファイル名に日本語を含むcommit.pathがそのままJSON.stringifyされてヘッダーに渡ると、
+// ブラウザのfetch()がヘッダー値のバリデーションで例外を投げる(WebKitでは詳細不明な
+// "Type error"というメッセージになる)。これが原因で、Web版では日本語を含むパスの
+// アップロードが常に失敗していた(ほぼ全ての提出が該当する)。
+function encodeDropboxApiArg(apiArg: unknown): string {
+  return JSON.stringify(apiArg).replace(/[^\x00-\x7f]/g, (ch) => {
+    return '\\u' + ch.charCodeAt(0).toString(16).padStart(4, '0');
+  });
+}
+
 async function getDropboxAccessToken(): Promise<string> {
   const { data, error } = await supabase.functions.invoke('dropbox-token');
   if (error) {
@@ -108,7 +120,7 @@ async function callDropboxContentFromFile(
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/octet-stream',
-        'Dropbox-API-Arg': JSON.stringify(apiArg),
+        'Dropbox-API-Arg': encodeDropboxApiArg(apiArg),
       },
     }
   );
@@ -131,7 +143,7 @@ async function callDropboxContentFromBlob(
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/octet-stream',
-      'Dropbox-API-Arg': JSON.stringify(apiArg),
+      'Dropbox-API-Arg': encodeDropboxApiArg(apiArg),
     },
     body: chunkBlob,
   });

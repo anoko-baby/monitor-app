@@ -461,6 +461,19 @@ Dropboxアップロードのチャンク処理バグ修正後も、一部のPNG�
 - 修正: `stripGpsMetadata`をtry/catchで包み、GPS除去に失敗した場合は元のファイルのまま後続のアップロード処理を継続するようにした(Web版・ネイティブ版とも)。サムネイル生成失敗時に既に採用していた「本体の提出は継続する」という方針をGPS除去にも適用した形。スクリーンショット等はそもそも位置情報を含まないケースが多く、位置情報を消せないことより提出物が一切アップロードできないことの方が実害が大きいと判断
 - `npx tsc --noEmit`・`npx expo export -p web`とも通過を確認済み
 
+**→ 上記の修正をリリース後も「Type error」が再発(2026-08-25追記)**。JPEGファイルでも発生したため、PNG固有のGPS除去ライブラリの問題という当初の診断は誤りだった(その修正自体は無害だが不十分)。改めて調査し、真因を特定・修正した(下記セクション参照)。
+
+---
+
+## 画像アップロードが「Type error」で失敗する不具合、真因を特定・修正(2026-08-25)
+
+前セクションの修正後も、PNGだけでなくJPEGでも「Type error」が発生し続けた(=あらゆるファイルで確実に再現)ことから、GPS除去ライブラリ固有の問題という当初の診断が誤りだと判明。改めて`lib/dropbox.ts`を調査した。
+
+- **真因**: Dropboxのチャンクアップロードは`Dropbox-API-Arg`という HTTPヘッダーに`{cursor, commit: {path, ...}}`をJSON化して渡す仕様になっている。この`path`(=`destPath`)は回次フォルダ名を含み、`lib/campaigns.ts`の`formatCycleFolderName`が生成する名前は必ず`第1回_20260830`のように**日本語(「第」「回」)を含む**。`lib/dropbox.ts`はこれを`JSON.stringify(apiArg)`でそのままヘッダー値にしていたが、ブラウザのFetch API(Headers)はヘッダー値にASCII(正確にはISO-8859-1)以外の文字を許容しておらず、日本語を含む文字列を渡すと`fetch()`が例外を投げる。WebKit(Safari)ではこの例外のメッセージが詳細不明な`"Type error"`になる。回次フォルダ名は常に日本語を含むため、**ファイルの種類やファイル名に関わらずWeb版のアップロードが原理的に100%失敗する**不具合だった(ネイティブ版は`expo-file-system`の`uploadAsync`を使っており、ブラウザのHeaders検証を経由しないため影響を受けていなかった)
+- 修正: `Dropbox-API-Arg`ヘッダーを生成する`encodeDropboxApiArg()`を新設し、JSON化した文字列のうちASCII範囲外の文字を`\uXXXX`エスケープに変換してからヘッダーにセットするようにした(Dropbox公式ドキュメントが定めるこのヘッダーの仕様どおりの対応。Dropbox側はこの`\uXXXX`表記を含むJSONを正しく元の文字列として解釈する)。Web版・ネイティブ版の両方の送信経路(`callDropboxContentFromBlob`/`callDropboxContentFromFile`)に適用
+- Node上で実際に日本語パスを含む`apiArg`をエンコード→デコードし、ASCII範囲内に収まること・元の文字列に正しく復元されることを確認済み
+- `npx tsc --noEmit`・`npx expo export -p web`とも通過を確認済み
+
 ---
 
 ## 未確定・要確認事項の記録
