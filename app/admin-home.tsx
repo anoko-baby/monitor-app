@@ -1,19 +1,18 @@
 import { router } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
-import { AppButton } from '../components/AppButton';
+import { BottomTabBar } from '../components/BottomTabBar';
 import { Screen } from '../components/Screen';
 import { supabase } from '../lib/supabase';
 
 const LINKS: {
   label: string;
-  href: '/admin-invite-issue' | '/admin-product-search' | '/admin-watched-coupons' | '/admin-coupon-orders' | '/admin-announcement-list';
+  href: '/admin-invite-issue' | '/admin-product-search' | '/admin-watched-coupons' | '/admin-coupon-orders';
 }[] = [
   { label: 'モニターを招待する', href: '/admin-invite-issue' },
   { label: '商品検索(Shopify)', href: '/admin-product-search' },
   { label: '監視クーポン登録', href: '/admin-watched-coupons' },
   { label: 'クーポン注文', href: '/admin-coupon-orders' },
-  { label: 'お知らせ配信', href: '/admin-announcement-list' },
 ];
 
 export default function AdminHome() {
@@ -23,38 +22,36 @@ export default function AdminHome() {
   }
 
   return (
-    <Screen className="px-6 pt-6">
-      <Text className="font-heading text-title-lg text-ink mb-8">ホーム</Text>
+    <Screen>
+      <ScrollView className="flex-1 px-6 pt-6" contentContainerStyle={{ paddingBottom: 24 }}>
+        <View className="flex-row items-center justify-between mb-8">
+          <Text className="font-heading text-title-lg text-ink">ホーム</Text>
+          <Pressable onPress={handleSignOut}>
+            <Text className="font-body text-caption text-ink-soft">ログアウト</Text>
+          </Pressable>
+        </View>
 
-      <View className="mb-6">
-        <AppButton label="案件一覧" onPress={() => router.push('/admin-campaign-list')} />
-      </View>
+        <Text className="font-body-medium text-caption text-ink-soft mb-2">その他のメニュー</Text>
+        {LINKS.map((link) => (
+          <Pressable
+            key={link.href}
+            onPress={() => router.push(link.href)}
+            className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2"
+          >
+            <Text className="font-body text-body text-ink">{link.label}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
 
-      <View className="mb-6">
-        <AppButton
-          label="全提出一覧"
-          onPress={() => router.push('/admin-submission-list')}
-          variant="secondary"
-        />
-      </View>
-
-      <View className="mb-6">
-        <AppButton label="モニター一覧" onPress={() => router.push('/admin-monitor-list')} variant="secondary" />
-      </View>
-
-      {LINKS.map((link) => (
-        <Pressable
-          key={link.href}
-          onPress={() => router.push(link.href)}
-          className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2"
-        >
-          <Text className="font-body text-body text-ink">{link.label}</Text>
-        </Pressable>
-      ))}
-
-      <Pressable onPress={handleSignOut} className="items-center mt-6">
-        <Text className="font-body text-caption text-ink-soft">ログアウト</Text>
-      </Pressable>
+      <BottomTabBar
+        items={[
+          { label: 'ホーム', href: '/admin-home' },
+          { label: '案件一覧', href: '/admin-campaign-list' },
+          { label: '全提出一覧', href: '/admin-submission-list' },
+          { label: 'モニター一覧', href: '/admin-monitor-list' },
+          { label: 'お知らせ配信', href: '/admin-announcement-list' },
+        ]}
+      />
     </Screen>
   );
 }

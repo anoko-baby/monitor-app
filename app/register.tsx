@@ -9,12 +9,19 @@ import { supabase } from '../lib/supabase';
 
 export default function Register() {
   const { code } = useLocalSearchParams<{ code: string }>();
+  const [name, setName] = useState('');
+  const [prefecture, setPrefecture] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleRegister() {
+    if (!name.trim() || !prefecture.trim() || !phone.trim()) {
+      setError('氏名・都道府県・電話番号を入力してください');
+      return;
+    }
     if (password.length < 8) {
       setError('パスワードは8文字以上で入力してください');
       return;
@@ -23,7 +30,7 @@ export default function Register() {
     setError(null);
 
     const { data, error: fnError } = await supabase.functions.invoke('invite-register', {
-      body: { code, email, password },
+      body: { code, email, password, name: name.trim(), prefecture: prefecture.trim(), phone: phone.trim() },
     });
 
     if (fnError || data?.error) {
@@ -46,11 +53,20 @@ export default function Register() {
 
   return (
     <View className="flex-1 bg-bg px-6 pt-6">
-      <Text className="font-heading text-title-lg text-ink mb-2">メールアドレスを登録してください</Text>
+      <Text className="font-heading text-title-lg text-ink mb-2">本登録</Text>
       <Text className="font-body text-body text-ink-soft mb-8">
         今後このメールアドレスとパスワードでログインします。
       </Text>
 
+      <TextField label="氏名" value={name} onChangeText={setName} />
+      <TextField label="都道府県" value={prefecture} onChangeText={setPrefecture} placeholder="広島県" />
+      <TextField
+        label="電話番号"
+        value={phone}
+        onChangeText={setPhone}
+        keyboardType="phone-pad"
+        placeholder="09012345678"
+      />
       <TextField
         label="メールアドレス"
         value={email}
@@ -72,7 +88,7 @@ export default function Register() {
       <AppButton
         label={loading ? '登録中…' : '登録する'}
         onPress={handleRegister}
-        disabled={!email || !password}
+        disabled={!name || !prefecture || !phone || !email || !password}
         loading={loading}
       />
     </View>

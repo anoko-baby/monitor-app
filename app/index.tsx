@@ -63,7 +63,14 @@ export default function Index() {
       <Text className="font-body text-body text-ink-soft mb-12">モニター管理アプリ</Text>
 
       <View className="mb-3">
-        <AppButton label="モニターの方はこちら" onPress={() => router.push('/invite-code')} />
+        <AppButton label="招待コードで登録する(初めての方)" onPress={() => router.push('/invite-code')} />
+      </View>
+      <View className="mb-8">
+        <AppButton
+          label="モニターの方はこちら(ログイン)"
+          variant="secondary"
+          onPress={() => router.push('/monitor-login')}
+        />
       </View>
       <AppButton
         label="スタッフ・管理者の方はこちら"

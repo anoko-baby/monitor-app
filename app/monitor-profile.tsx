@@ -11,9 +11,11 @@ import { supabase } from '../lib/supabase';
 
 type OwnProfile = {
   id: string;
-  name: string;
+  name: string | null;
   nickname: string | null;
   email: string | null;
+  prefecture: string | null;
+  phone: string | null;
   wifi_only_upload: boolean;
 };
 
@@ -33,7 +35,7 @@ export default function MonitorProfile() {
 
       const { data } = await supabase
         .from('profiles')
-        .select('id, name, nickname, email, wifi_only_upload')
+        .select('id, name, nickname, email, prefecture, phone, wifi_only_upload')
         .eq('auth_user_id', session.user.id)
         .maybeSingle();
       setProfile(data);
@@ -75,7 +77,9 @@ export default function MonitorProfile() {
 
   return (
     <ScrollView className="flex-1 bg-bg" contentContainerStyle={{ padding: 24 }}>
-      <TextField label="氏名" value={profile.name} editable={false} />
+      <TextField label="氏名" value={profile.name ?? ''} editable={false} />
+      <TextField label="都道府県" value={profile.prefecture ?? ''} editable={false} />
+      <TextField label="電話番号" value={profile.phone ?? ''} editable={false} />
       <TextField
         label="ニックネーム"
         value={profile.nickname ?? ''}

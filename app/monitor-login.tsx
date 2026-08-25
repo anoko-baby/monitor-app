@@ -1,15 +1,15 @@
-import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Platform, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { TextField } from '../components/TextField';
-import { registerPushTokenForCurrentUser } from '../lib/push';
 import { supabase } from '../lib/supabase';
 
-export default function AdminLogin() {
+// モニターの再ログイン画面。招待コード登録は初回のみで、以後はここからメール/パスワードでログインする
+// (ブラウザのセッションが切れた場合や機種変更時に必要。今まで導線が無かった不具合の修正)。
+export default function MonitorLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -30,34 +30,21 @@ export default function AdminLogin() {
       return;
     }
 
-    // モニターアカウントがこの画面からログインできてしまう不具合の修正。
-    // role=admin/staffでなければ即座にサインアウトし、管理画面へは絶対に入れない。
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, tos_agreed_at')
       .eq('auth_user_id', signInData.user.id)
       .maybeSingle();
 
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'staff')) {
+    if (!profile || profile.role !== 'monitor') {
       await supabase.auth.signOut();
       setLoading(false);
-      setError('このアカウントには管理者/スタッフの権限がありません');
+      setError('モニターアカウントが見つかりませんでした');
       return;
     }
 
     setLoading(false);
-
-    // 管理者/スタッフもN5(提出通知)・N7(期限超過報告)・N11(クーポン注文)・N12(異常検知)の宛先になるため、
-    // モニターと同様にログイン時に通知許可を求める(拒否されてもログイン自体はブロックしない)。
-    // Web版はWeb Push未整備のため、許可リクエスト自体を行わない。
-    if (Platform.OS !== 'web') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status === 'granted') {
-        await registerPushTokenForCurrentUser();
-      }
-    }
-
-    router.replace('/admin-home');
+    router.replace(profile.tos_agreed_at ? '/monitor-home' : '/consent');
   }
 
   return (

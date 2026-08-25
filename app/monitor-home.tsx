@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
+import { BottomTabBar } from '../components/BottomTabBar';
 import { CycleDots } from '../components/CycleDots';
 import { Screen } from '../components/Screen';
 import { CycleDotStatus, deriveCycleStatus } from '../lib/campaigns';
@@ -144,26 +145,17 @@ export default function MonitorHome() {
   }
 
   return (
-    <Screen className="px-6 pt-6">
+    <Screen>
+      <View className="flex-1 px-6 pt-6">
       <View className="flex-row items-center justify-between mb-6">
         <Text className="font-heading text-title-lg text-ink">あなたの案件</Text>
-        <View className="flex-row items-center" style={{ gap: 16 }}>
-          <Pressable onPress={() => router.push('/announcements')} className="flex-row items-center">
-            <Text className="font-body text-caption text-accent-ink">お知らせ</Text>
-            {unreadAnnouncements > 0 && (
-              <View className="bg-status-overdue rounded-full w-2 h-2 ml-1" />
-            )}
-          </Pressable>
-          <Pressable onPress={() => router.push('/submission-history')}>
-            <Text className="font-body text-caption text-accent-ink">提出履歴</Text>
-          </Pressable>
-          <Pressable onPress={() => router.push('/monitor-profile')}>
-            <Text className="font-body text-caption text-accent-ink">プロフィール</Text>
-          </Pressable>
-        </View>
+        <Pressable onPress={handleSignOut}>
+          <Text className="font-body text-caption text-ink-soft">ログアウト</Text>
+        </Pressable>
       </View>
 
       <FlatList
+        style={{ flex: 1 }}
         data={campaigns}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
@@ -202,10 +194,16 @@ export default function MonitorHome() {
           </Pressable>
         )}
       />
+      </View>
 
-      <Pressable onPress={handleSignOut} className="items-center mt-4">
-        <Text className="font-body text-caption text-ink-soft">ログアウト</Text>
-      </Pressable>
+      <BottomTabBar
+        items={[
+          { label: 'ホーム', href: '/monitor-home' },
+          { label: '提出履歴', href: '/submission-history' },
+          { label: 'お知らせ', href: '/announcements', badge: unreadAnnouncements },
+          { label: 'プロフィール', href: '/monitor-profile' },
+        ]}
+      />
     </Screen>
   );
 }
