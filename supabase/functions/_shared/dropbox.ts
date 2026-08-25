@@ -40,15 +40,32 @@ export function sanitizeDropboxPathSegment(segment: string): string {
   return segment.replace(/[/\\:*?"<>|]/g, '-').trim();
 }
 
+// Dropboxアカウントが会社(チーム)アカウントの場合、Full Dropbox権限でも既定では自分の
+// ホーム名前空間が起点になり、「モニターデータ」のようなチーム共有フォルダは別の名前空間として
+// 扱われる。DROPBOX_ROOT_NAMESPACE_ID を設定すると、Dropbox-API-Path-Rootヘッダーでその
+// 名前空間をAPIの起点として明示的に指定できる(未設定なら従来どおり既定の起点のまま)。
+export function getDropboxRootNamespaceId(): string | null {
+  return Deno.env.get('DROPBOX_ROOT_NAMESPACE_ID') || null;
+}
+
+function pathRootHeader(rootNamespaceId?: string | null): Record<string, string> {
+  if (!rootNamespaceId) return {};
+  return {
+    'Dropbox-API-Path-Root': JSON.stringify({ '.tag': 'namespace_id', namespace_id: rootNamespaceId }),
+  };
+}
+
 export async function createDropboxFolder(
   accessToken: string,
-  path: string
+  path: string,
+  rootNamespaceId?: string | null
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const response = await fetch('https://api.dropboxapi.com/2/files/create_folder_v2', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
+      ...pathRootHeader(rootNamespaceId),
     },
     body: JSON.stringify({ path, autorename: false }),
   });

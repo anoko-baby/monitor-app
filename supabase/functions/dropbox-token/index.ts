@@ -1,6 +1,6 @@
 // Dropboxのリフレッシュトークンから短命アクセストークンを発行する。
 // App Key/Secret/リフレッシュトークンはSupabase Secretsにのみ置き、クライアントには渡さない(仕様書 v1.8 2.2 / 6.2)。
-import { getDropboxAccessToken } from '../_shared/dropbox.ts';
+import { getDropboxAccessToken, getDropboxRootNamespaceId } from '../_shared/dropbox.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,7 +27,7 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  return new Response(JSON.stringify(result), {
+  return new Response(JSON.stringify({ ...result, rootNamespaceId: getDropboxRootNamespaceId() }), {
     status: 200,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
