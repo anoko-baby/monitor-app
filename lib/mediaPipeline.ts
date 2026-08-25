@@ -4,7 +4,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { Platform } from 'react-native';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 
-import { createDropboxSharedLink, uploadFileToDropboxChunked, UploadProgress } from './dropbox';
+import { createDropboxSharedLink, fetchBlobWithRetry, uploadFileToDropboxChunked, UploadProgress } from './dropbox';
 import { supabase } from './supabase';
 
 const isWeb = Platform.OS === 'web';
@@ -75,9 +75,12 @@ function asciiToBytes(value: string): Uint8Array {
 // Web版はexpo-file-systemのFile/FileHandleが未対応のため、blob: URLの中身をメモリ上の
 // Uint8Arrayとして読み書きし、処理後に新しいBlob/blob: URLを作って返す(呼び出し元は
 // 戻り値のURIを以後の処理で使うこと)。
-async function stripGpsMetadata(fileUri: string): Promise<string> {
+// Web版は戻り値に処理済みBlobも含める。呼び出し元(アップロード処理)がこのURLを改めて
+// fetchし直さずに済むようにするため(Safariではblob: URLの再fetchが「Load failed」で
+// 失敗することがある)。
+async function stripGpsMetadata(fileUri: string): Promise<{ uri: string; blob: Blob | null }> {
   if (isWeb) {
-    const blob = await fetch(fileUri).then((r) => r.blob());
+    const blob = await fetchBlobWithRetry(fileUri);
     const buffer = new Uint8Array(await blob.arrayBuffer());
 
     const read = async (size: number, offset: number): Promise<ArrayBuffer> => {
@@ -90,7 +93,7 @@ async function stripGpsMetadata(fileUri: string): Promise<string> {
     await removeLocation(fileUri, read, write);
 
     const newBlob = new Blob([buffer], { type: blob.type });
-    return URL.createObjectURL(newBlob);
+    return { uri: URL.createObjectURL(newBlob), blob: newBlob };
   }
 
   const file = new File(fileUri);
@@ -107,7 +110,7 @@ async function stripGpsMetadata(fileUri: string): Promise<string> {
       handle.writeBytes(bytes);
     };
     await removeLocation(fileUri, read, write);
-    return fileUri;
+    return { uri: fileUri, blob: null };
   } finally {
     handle.close();
   }
@@ -191,7 +194,7 @@ function captureVideoFrameOnWeb(
 }
 
 async function uploadThumbnail(localUri: string, storagePath: string): Promise<void> {
-  const body = isWeb ? await fetch(localUri).then((r) => r.blob()) : await new File(localUri).bytes();
+  const body = isWeb ? await fetchBlobWithRetry(localUri) : await new File(localUri).bytes();
   const { error } = await supabase.storage.from(THUMBNAILS_BUCKET).upload(storagePath, body, {
     contentType: 'image/jpeg',
     upsert: true,
@@ -245,13 +248,15 @@ export async function processAndUploadFile({
     thumbnailStoragePath = null;
   }
 
-  workingUri = await stripGpsMetadata(workingUri);
+  const stripped = await stripGpsMetadata(workingUri);
+  workingUri = stripped.uri;
 
   const { path: dropboxPath } = await uploadFileToDropboxChunked({
     fileUri: workingUri,
     destPath: dropboxDestPath,
     resumeKey: `${submissionId}:${workingFileName}`,
     onProgress,
+    webBlob: stripped.blob ?? undefined,
   });
   const dropboxSharedUrl = await createDropboxSharedLink(dropboxPath);
 

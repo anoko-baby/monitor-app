@@ -370,6 +370,18 @@ TestFlight配信の本稼働までまだ時間がかかるため、モニター�
 - 実際のSupabase環境でのmigration適用(`npx supabase db push`)と、モニター側での動作確認(子ども選択→カラー/サイズ選択→身長体重入力→提出→管理画面で正しく表示されるか)はまだ未実施
 - カレンダーUI(`CalendarPicker`)はサンドボックス内でのビルド確認のみで、実機での操作感(タップ範囲・レスポンスなど)は未確認
 
+## Dropboxアップロード「Load failed」の修正、プロフィール/ホームのWEAR風ヒアデザイン(2026-08-25)
+
+**Dropboxアップロード不具合(実機で継続していた「Load failed」/「Failed to send a request」)**
+- CORS修正後も画像アップロードが失敗し続けていた件を再調査。原因は`lib/mediaPipeline.ts`のGPS除去処理(`stripGpsMetadata`)がWeb版で処理後に新しい`blob:` URLを作成し、それを`lib/dropbox.ts`の`uploadFileToDropboxChunked`が改めて`fetch()`し直していたこと。Safari(WebKit)は`blob:` URLを作成から時間が経つ・他の非同期処理を挟むと`fetch()`が「Load failed」で失敗させることがある既知の挙動があり、これに該当していた
+- 修正: `stripGpsMetadata`が処理済みの`Blob`オブジェクト自体も呼び出し元に返すようにし、`uploadFileToDropboxChunked`はそのBlobを直接受け取れるオプション引数(`webBlob`)を追加。これにより同じblob URLを二度fetchし直す必要が無くなった。あわせて、他に残っているblob URLのfetch箇所(サムネイルアップロード等)にも数回リトライする`fetchBlobWithRetry`ヘルパー(`lib/dropbox.ts`)を導入し、同種の問題への耐性を上げた
+
+**プロフィール/ホーム画面のWEAR風ヒーローデザイン**
+- `components/HeroScreen.tsx`を新設。濃色(ink色)のヘッダー領域の下に角丸の白系シートが被さって出てくるレイアウトで、シート上部にアイコン+ラベルのタブ(選択中のみ塗りつぶしアイコン+下線)を配置できる。WEARアプリのプロフィール/ホーム画面のスクリーンショットを参考に実装(仕様書には無い追加対応)
+- `app/monitor-profile.tsx`: 「プロフィール情報」「子ども情報」の2タブ構成に変更。ヘッダーにアバター(頭文字丸アイコン)+氏名+Instagramアカウント名(@表示)を追加。ログアウトボタンはプロフィール情報タブの最下部のみに配置(ホーム画面など他画面からは撤去)
+- `app/monitor-home.tsx`: 「未提出」「提出済み」の2タブ構成に変更(案件の`pendingCount`で振り分け)。ログアウトボタンを撤去(プロフィール画面に一本化)
+- 管理者側画面・提出詳細/フォーム系画面など、他の画面はまだWEAR風ヒーローデザインに未対応(必要であれば次回以降のセッションで展開する)
+
 ---
 
 ## 未確定・要確認事項の記録

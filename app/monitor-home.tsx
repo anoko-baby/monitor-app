@@ -5,7 +5,7 @@ import { FlatList, Pressable, Text, View } from 'react-native';
 import { BottomTabBar } from '../components/BottomTabBar';
 import { CycleDots } from '../components/CycleDots';
 import { ErrorBanner } from '../components/ErrorBanner';
-import { Screen } from '../components/Screen';
+import { HeroScreen } from '../components/HeroScreen';
 import { CycleDotStatus, deriveCycleStatus } from '../lib/campaigns';
 import { supabase } from '../lib/supabase';
 import { monitorTabItems } from '../lib/tabItems';
@@ -30,6 +30,7 @@ export default function MonitorHome() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [unreadAnnouncements, setUnreadAnnouncements] = useState(0);
+  const [activeTab, setActiveTab] = useState<'pending' | 'done'>('pending');
 
   async function load() {
     setLoading(true);
@@ -155,66 +156,67 @@ export default function MonitorHome() {
     loadUnreadAnnouncements();
   }, []);
 
-  async function handleSignOut() {
-    await supabase.auth.signOut();
-    router.replace('/');
-  }
+  const visibleCampaigns = campaigns.filter((c) => (activeTab === 'pending' ? c.pendingCount > 0 : c.pendingCount === 0));
 
   return (
-    <Screen>
-      <View className="flex-1 px-6 pt-6">
-      <View className="flex-row items-center justify-between mb-6">
-        <Text className="font-heading text-title-lg text-ink">あなたの案件</Text>
-        <Pressable onPress={handleSignOut}>
-          <Text className="font-body text-caption text-ink-soft">ログアウト</Text>
-        </Pressable>
-      </View>
+    <View className="flex-1">
+      <HeroScreen
+        title="あなたの案件"
+        subtitle={`未提出 ${campaigns.filter((c) => c.pendingCount > 0).length}件`}
+        tabs={[
+          { key: 'pending', label: '未提出', icon: 'time-outline', activeIcon: 'time' },
+          { key: 'done', label: '提出済み', icon: 'checkmark-circle-outline', activeIcon: 'checkmark-circle' },
+        ]}
+        activeTab={activeTab}
+        onTabChange={(key) => setActiveTab(key as 'pending' | 'done')}
+      >
+        <View className="flex-1 px-6 pt-4">
+          {loadError && <ErrorBanner message={loadError} />}
 
-      {loadError && <ErrorBanner message={loadError} />}
-
-      <FlatList
-        style={{ flex: 1 }}
-        data={campaigns}
-        keyExtractor={(item) => item.id}
-        ListEmptyComponent={
-          !loading ? (
-            <Text className="font-body text-caption text-ink-soft">
-              まだ案件はありません。準備が整いましたらお知らせします。
-            </Text>
-          ) : null
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => router.push({ pathname: '/campaign-detail', params: { id: item.id } })}
-            className="bg-surface rounded-card border-hairline border-line px-4 py-4 mb-3"
-          >
-            <Text className="font-body-medium text-body text-ink mb-1">{item.title}</Text>
-            <Text className="font-body text-caption text-ink-soft mb-2">{item.productLabel}</Text>
-
-            <View className="flex-row items-center justify-between mb-2">
-              {item.nextDueDate ? (
-                <Text className="font-body-medium text-title text-status-overdue">
-                  次の期限: {formatDueDate(item.nextDueDate)}
+          <FlatList
+            style={{ flex: 1 }}
+            data={visibleCampaigns}
+            keyExtractor={(item) => item.id}
+            ListEmptyComponent={
+              !loading ? (
+                <Text className="font-body text-caption text-ink-soft">
+                  {activeTab === 'pending' ? '未提出の案件はありません' : 'まだ提出済みの案件はありません'}
                 </Text>
-              ) : (
-                <Text className="font-body text-caption text-ink-soft">未提出の項目はありません</Text>
-              )}
-              {item.pendingCount > 0 && (
-                <View className="bg-status-overdue/10 rounded-full px-3 py-1">
-                  <Text className="font-body-medium text-caption text-status-overdue">
-                    未提出 {item.pendingCount}
-                  </Text>
-                </View>
-              )}
-            </View>
+              ) : null
+            }
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() => router.push({ pathname: '/campaign-detail', params: { id: item.id } })}
+                className="bg-surface rounded-card border-hairline border-line px-4 py-4 mb-3"
+              >
+                <Text className="font-body-medium text-body text-ink mb-1">{item.title}</Text>
+                <Text className="font-body text-caption text-ink-soft mb-2">{item.productLabel}</Text>
 
-            {item.cycleStatuses.length > 0 && <CycleDots statuses={item.cycleStatuses} />}
-          </Pressable>
-        )}
-      />
-      </View>
+                <View className="flex-row items-center justify-between mb-2">
+                  {item.nextDueDate ? (
+                    <Text className="font-body-medium text-title text-status-overdue">
+                      次の期限: {formatDueDate(item.nextDueDate)}
+                    </Text>
+                  ) : (
+                    <Text className="font-body text-caption text-ink-soft">未提出の項目はありません</Text>
+                  )}
+                  {item.pendingCount > 0 && (
+                    <View className="bg-status-overdue/10 rounded-full px-3 py-1">
+                      <Text className="font-body-medium text-caption text-status-overdue">
+                        未提出 {item.pendingCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {item.cycleStatuses.length > 0 && <CycleDots statuses={item.cycleStatuses} />}
+              </Pressable>
+            )}
+          />
+        </View>
+      </HeroScreen>
 
       <BottomTabBar items={monitorTabItems(unreadAnnouncements)} />
-    </Screen>
+    </View>
   );
 }
