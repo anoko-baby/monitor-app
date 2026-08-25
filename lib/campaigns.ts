@@ -38,6 +38,29 @@ export function monitorDisplayName(m: { name: string | null; instagramHandle?: s
   return m.name ?? (m.instagramHandle ? `@${m.instagramHandle}(本登録前)` : '(名前未登録)');
 }
 
+// 月齢(整数)を「n歳nヶ月」形式のラベルにする。
+export function formatAgeMonths(months: number | null | undefined): string {
+  if (months === null || months === undefined) return '-';
+  const years = Math.floor(months / 12);
+  const rem = months % 12;
+  return years > 0 ? `${years}歳${rem}ヶ月` : `${months}ヶ月`;
+}
+
+// 生年月(YYYY-MM-DD, 日は無視)と基準日から月齢を計算し「n歳nヶ月」形式のラベルを返す。
+// 子ども一覧の「現在の年齢」表示、提出フォームの「撮影時点の年齢」表示の両方で使う。
+export function computeAgeLabel(birthMonth: string, atDate: string): { months: number; label: string } {
+  const [by, bm] = birthMonth.split('-').map(Number);
+  const [ay, am] = atDate.split('-').map(Number);
+  const months = Math.max(0, (ay - by) * 12 + (am - bm));
+  return { months, label: formatAgeMonths(months) };
+}
+
+// 今日時点(ローカル日付)のYYYY-MM-DD文字列。
+export function todayDateString(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
 function parseYearMonth(dateStr: string): { year: number; month: number } {
   const [year, month] = dateStr.split('-').map((v) => parseInt(v, 10));
   return { year, month };

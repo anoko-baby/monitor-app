@@ -1,19 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { computeAgeLabel, todayDateString } from '../lib/campaigns';
 import { supabase } from '../lib/supabase';
 import { AppButton } from './AppButton';
+import { CalendarPicker } from './CalendarPicker';
 import { ErrorBanner } from './ErrorBanner';
 import { TextField } from './TextField';
-
-// birth_month はDB上は date 型(年月日)。"YYYY-MM" 入力を月初日に正規化して保存する。
-function normalizeBirthMonth(input: string): { value: string | null; error: string | null } {
-  const trimmed = input.trim();
-  if (!trimmed) return { value: null, error: null };
-  if (/^\d{4}-\d{2}$/.test(trimmed)) return { value: `${trimmed}-01`, error: null };
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return { value: trimmed, error: null };
-  return { value: null, error: '生年月は YYYY-MM の形式で入力してください(例: 2024-05)' };
-}
 
 type Child = {
   id: string;
@@ -27,7 +20,7 @@ export function ChildrenManager({ monitorId }: { monitorId: string }) {
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newBirthMonth, setNewBirthMonth] = useState('');
+  const [newBirthMonth, setNewBirthMonth] = useState<string | null>(null);
   const [newSex, setNewSex] = useState<'male' | 'female' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -51,19 +44,13 @@ export function ChildrenManager({ monitorId }: { monitorId: string }) {
   async function handleAdd() {
     if (!newName) return;
 
-    const { value: birthMonth, error: formatError } = normalizeBirthMonth(newBirthMonth);
-    if (formatError) {
-      setError(formatError);
-      return;
-    }
-
     setSaving(true);
     setError(null);
 
     const { error: insertError } = await supabase.from('children').insert({
       monitor_id: monitorId,
       call_name: newName,
-      birth_month: birthMonth,
+      birth_month: newBirthMonth,
       sex: newSex,
     });
 
@@ -75,7 +62,7 @@ export function ChildrenManager({ monitorId }: { monitorId: string }) {
     }
 
     setNewName('');
-    setNewBirthMonth('');
+    setNewBirthMonth(null);
     setNewSex(null);
     setAdding(false);
     loadChildren();
@@ -89,6 +76,8 @@ export function ChildrenManager({ monitorId }: { monitorId: string }) {
     }
     loadChildren();
   }
+
+  const today = todayDateString();
 
   return (
     <View>
@@ -108,7 +97,11 @@ export function ChildrenManager({ monitorId }: { monitorId: string }) {
           <View>
             <Text className="font-body text-body text-ink">{child.call_name}</Text>
             <Text className="font-body text-caption text-ink-soft">
-              {child.birth_month ?? '生年月未設定'}
+              {child.birth_month
+                ? `${child.birth_month.slice(0, 7).replace('-', '年')}月 ・ 現在${
+                    computeAgeLabel(child.birth_month, today).label
+                  }`
+                : '生年月未設定'}
               {child.sex ? (child.sex === 'male' ? ' ・ 男の子' : ' ・ 女の子') : ''}
             </Text>
           </View>
@@ -123,12 +116,7 @@ export function ChildrenManager({ monitorId }: { monitorId: string }) {
       {adding ? (
         <View className="bg-surface rounded-card border-hairline border-line p-4 mt-2">
           <TextField label="呼び名" value={newName} onChangeText={setNewName} />
-          <TextField
-            label="生年月(例: 2024-05)"
-            value={newBirthMonth}
-            onChangeText={setNewBirthMonth}
-            placeholder="YYYY-MM"
-          />
+          <CalendarPicker label="生年月" mode="month" value={newBirthMonth} onChange={setNewBirthMonth} maxDate={today} />
 
           <Text className="font-body text-caption text-ink-soft mb-2">性別(任意)</Text>
           <View className="flex-row mb-4">

@@ -5,9 +5,10 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
+import { CalendarPicker } from '../components/CalendarPicker';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { TextField } from '../components/TextField';
-import { formatCycleFolderName, formatSubmissionFileName } from '../lib/campaigns';
+import { computeAgeLabel, formatCycleFolderName, formatSubmissionFileName, todayDateString } from '../lib/campaigns';
 import { getThumbnailSignedUrl, processAndUploadFile } from '../lib/mediaPipeline';
 import { supabase } from '../lib/supabase';
 import { clearDraft, DraftFile, loadDraft, saveDraft } from '../lib/submissionDraft';
@@ -26,6 +27,9 @@ type FieldDef = {
   is_required: boolean;
 };
 
+type ChildOption = { id: string; call_name: string; birth_month: string | null };
+type VariantOption = { id: string; sku: string | null; size: string | null; color: string | null };
+
 type ExistingFile = {
   id: string;
   kind: 'photo' | 'video';
@@ -39,16 +43,12 @@ function formatDueDate(dateStr: string): string {
   return `${parseInt(month, 10)}月${parseInt(day, 10)}日`;
 }
 
-function computeAgeDisplay(birthMonth: string, shotDate: string): { months: number; label: string } {
-  const [by, bm] = birthMonth.split('-').map(Number);
-  const [sy, sm] = shotDate.split('-').map(Number);
-  const months = (sy - by) * 12 + (sm - bm);
-  const years = Math.floor(months / 12);
-  const rem = months % 12;
-  return { months, label: years > 0 ? `${years}歳${rem}ヶ月` : `${months}ヶ月` };
+function variantLabel(v: VariantOption): string {
+  return [v.color, v.size].filter(Boolean).join(' / ') || v.sku || '(商品)';
 }
 
-// モニター側 データ提出フォーム(仕様書 v1.8 画面一覧6)。ファイル選択+動的フォーム項目。
+// モニター側 データ提出フォーム(仕様書 v1.8 画面一覧6)。ファイル選択+動的フォーム項目+
+// 複数の子ども(登録済みchildrenから複数選択)ごとの着用バリエーション/身長体重等/年齢の記録。
 export default function SubmissionForm() {
   const { taskId } = useLocalSearchParams<{ taskId: string }>();
 
@@ -62,16 +62,20 @@ export default function SubmissionForm() {
   const [cycleLabel, setCycleLabel] = useState('');
   const [cycleNo, setCycleNo] = useState(0);
   const [dropboxBasePath, setDropboxBasePath] = useState<string | null>(null);
-  const [skuInfo, setSkuInfo] = useState<{ sku: string | null; size: string | null; color: string | null }[]>([]);
+  const [campaignVariants, setCampaignVariants] = useState<VariantOption[]>([]);
   const [fieldDefs, setFieldDefs] = useState<FieldDef[]>([]);
-  const [childBirthMonth, setChildBirthMonth] = useState<string | null>(null);
   const [wifiOnly, setWifiOnly] = useState(false);
+
+  const [children, setChildren] = useState<ChildOption[]>([]);
+  const [selectedChildIds, setSelectedChildIds] = useState<string[]>([]);
+  const [childFieldValues, setChildFieldValues] = useState<Record<string, Record<string, string>>>({});
+  const [childVariantIds, setChildVariantIds] = useState<Record<string, string[]>>({});
+  const [submissionChildRowIds, setSubmissionChildRowIds] = useState<Record<string, string>>({});
 
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [version, setVersion] = useState(1);
   const [existingFiles, setExistingFiles] = useState<ExistingFile[]>([]);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
-  const [ageEdited, setAgeEdited] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<DraftFile[]>([]);
 
   const [submitting, setSubmitting] = useState(false);
@@ -90,8 +94,15 @@ export default function SubmissionForm() {
 
   useEffect(() => {
     if (loading) return;
-    saveDraft(taskId, { formValues: fieldValues, files: pendingFiles, updatedAt: new Date().toISOString() });
-  }, [fieldValues, pendingFiles, loading]);
+    saveDraft(taskId, {
+      formValues: fieldValues,
+      files: pendingFiles,
+      updatedAt: new Date().toISOString(),
+      selectedChildIds,
+      childFieldValues,
+      childVariantIds,
+    });
+  }, [fieldValues, pendingFiles, selectedChildIds, childFieldValues, childVariantIds, loading]);
 
   useEffect(() => {
     if (!wifiOnly) return;
@@ -157,15 +168,6 @@ export default function SubmissionForm() {
       setCampaignTitle(campaign.title);
       setDropboxBasePath(campaign.dropbox_base_path);
       basePathRef.current = campaign.dropbox_base_path;
-
-      if (campaign.child_id) {
-        const { data: child } = await supabase
-          .from('children')
-          .select('birth_month')
-          .eq('id', campaign.child_id)
-          .maybeSingle();
-        setChildBirthMonth(child?.birth_month ?? null);
-      }
     }
 
     const { data: variantLinks } = await supabase
@@ -175,9 +177,9 @@ export default function SubmissionForm() {
     if (variantLinks && variantLinks.length > 0) {
       const { data: variantsData } = await supabase
         .from('variants')
-        .select('sku, size, color')
+        .select('id, sku, size, color')
         .in('id', variantLinks.map((v) => v.variant_id));
-      setSkuInfo(variantsData ?? []);
+      setCampaignVariants(variantsData ?? []);
     }
 
     const { data: fieldRows } = await supabase
@@ -197,17 +199,28 @@ export default function SubmissionForm() {
       .sort((a: any, b: any) => a.sortOrder - b.sortOrder);
     setFieldDefs(defs);
 
+    let profileId: string | null = null;
     const {
       data: { session },
     } = await supabase.auth.getSession();
     if (session) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('wifi_only_upload')
+        .select('id, wifi_only_upload')
         .eq('auth_user_id', session.user.id)
         .maybeSingle();
+      profileId = profile?.id ?? null;
       // Web版はブラウザがWi-Fi/モバイル回線を区別できないため、この設定は無視して常にアップロードする
       setWifiOnly(Platform.OS === 'web' ? false : profile?.wifi_only_upload ?? false);
+    }
+
+    if (profileId) {
+      const { data: childrenData } = await supabase
+        .from('children')
+        .select('id, call_name, birth_month')
+        .eq('monitor_id', profileId)
+        .order('created_at', { ascending: true });
+      setChildren(childrenData ?? []);
     }
 
     const { data: submission } = await supabase
@@ -223,6 +236,39 @@ export default function SubmissionForm() {
       setVersion(submission.version);
       setFieldValues((submission.form_data as Record<string, string>) ?? {});
 
+      const { data: existingChildren } = await supabase
+        .from('submission_children')
+        .select('id, child_id, form_data')
+        .eq('submission_id', submission.id);
+
+      if (existingChildren && existingChildren.length > 0) {
+        setSelectedChildIds(existingChildren.map((r) => r.child_id));
+        const rowIds: Record<string, string> = {};
+        const values: Record<string, Record<string, string>> = {};
+        for (const r of existingChildren) {
+          rowIds[r.child_id] = r.id;
+          values[r.child_id] = (r.form_data as Record<string, string>) ?? {};
+        }
+        setSubmissionChildRowIds(rowIds);
+        setChildFieldValues(values);
+
+        const scIds = existingChildren.map((r) => r.id);
+        const { data: existingVariants } = await supabase
+          .from('submission_child_variants')
+          .select('submission_child_id, variant_id')
+          .in('submission_child_id', scIds);
+        const childIdByScId = new Map(existingChildren.map((r) => [r.id, r.child_id]));
+        const variantMap: Record<string, string[]> = {};
+        for (const v of existingVariants ?? []) {
+          const childId = childIdByScId.get(v.submission_child_id);
+          if (!childId) continue;
+          variantMap[childId] = [...(variantMap[childId] ?? []), v.variant_id];
+        }
+        setChildVariantIds(variantMap);
+      } else if (campaign?.child_id) {
+        setSelectedChildIds([campaign.child_id]);
+      }
+
       const { data: filesData } = await supabase
         .from('submission_files')
         .select('id, kind, original_filename, thumbnail_url')
@@ -236,11 +282,16 @@ export default function SubmissionForm() {
       );
       setExistingFiles(withSigned as ExistingFile[]);
       existingCount = withSigned.length;
+    } else if (campaign?.child_id) {
+      setSelectedChildIds([campaign.child_id]);
     }
 
     const draft = await loadDraft(taskId);
     if (draft) {
       setFieldValues((prev) => ({ ...prev, ...draft.formValues }));
+      if (draft.selectedChildIds) setSelectedChildIds(draft.selectedChildIds);
+      if (draft.childFieldValues) setChildFieldValues((prev) => ({ ...prev, ...draft.childFieldValues }));
+      if (draft.childVariantIds) setChildVariantIds((prev) => ({ ...prev, ...draft.childVariantIds }));
       const restoredFiles = draft.files.map((f) =>
         f.status === 'done' || f.status === 'error' ? f : { ...f, status: 'pending' as const }
       );
@@ -253,18 +304,26 @@ export default function SubmissionForm() {
     setLoading(false);
   }
 
-  useEffect(() => {
-    if (!fieldValues.shot_date || !childBirthMonth || ageEdited) return;
-    const hasAgeField = fieldDefs.some((f) => f.key === 'age_months');
-    if (!hasAgeField) return;
-    const { months } = computeAgeDisplay(childBirthMonth, fieldValues.shot_date);
-    setFieldValues((prev) => ({ ...prev, age_months: String(months) }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fieldValues.shot_date, childBirthMonth, fieldDefs]);
-
   function setFieldValue(key: string, value: string) {
-    if (key === 'age_months') setAgeEdited(true);
     setFieldValues((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function toggleChild(childId: string) {
+    setSelectedChildIds((prev) => (prev.includes(childId) ? prev.filter((id) => id !== childId) : [...prev, childId]));
+  }
+
+  function setChildFieldValue(childId: string, key: string, value: string) {
+    setChildFieldValues((prev) => ({ ...prev, [childId]: { ...(prev[childId] ?? {}), [key]: value } }));
+  }
+
+  function toggleChildVariant(childId: string, variantId: string) {
+    setChildVariantIds((prev) => {
+      const current = prev[childId] ?? [];
+      const next = current.includes(variantId)
+        ? current.filter((id) => id !== variantId)
+        : [...current, variantId];
+      return { ...prev, [childId]: next };
+    });
   }
 
   async function ensureSubmissionId(): Promise<string> {
@@ -387,13 +446,29 @@ export default function SubmissionForm() {
     setPendingFiles((prev) => prev.filter((f) => f.key !== key));
   }
 
+  const shotDateField = fieldDefs.find((f) => f.key === 'shot_date');
+  const childFieldDefs = fieldDefs.filter((f) => f.key !== 'shot_date' && f.key !== 'age_months');
+  const selectedChildren = children.filter((c) => selectedChildIds.includes(c.id));
+
   async function handleSubmit() {
     setSubmitError(null);
 
-    for (const f of fieldDefs) {
-      if (f.is_required && !fieldValues[f.key]) {
-        setSubmitError(`${f.label}を入力してください`);
-        return;
+    if (shotDateField?.is_required && !fieldValues.shot_date) {
+      setSubmitError(`${shotDateField.label}を選択してください`);
+      return;
+    }
+
+    if (children.length > 0 && selectedChildIds.length === 0) {
+      setSubmitError('対象の子どもを選択してください');
+      return;
+    }
+
+    for (const child of selectedChildren) {
+      for (const f of childFieldDefs) {
+        if (f.is_required && !childFieldValues[child.id]?.[f.key]) {
+          setSubmitError(`${child.call_name}さんの${f.label}を入力してください`);
+          return;
+        }
       }
     }
 
@@ -419,6 +494,58 @@ export default function SubmissionForm() {
         .update({ form_data: fieldValues, version: newVersion })
         .eq('id', subId);
       if (subError) throw new Error('提出内容の保存に失敗しました');
+
+      const removedChildIds = Object.keys(submissionChildRowIds).filter((id) => !selectedChildIds.includes(id));
+      if (removedChildIds.length > 0) {
+        const { error: removeError } = await supabase
+          .from('submission_children')
+          .delete()
+          .in('id', removedChildIds.map((id) => submissionChildRowIds[id]));
+        if (removeError) throw new Error('子ども情報の更新に失敗しました');
+      }
+
+      const nextRowIds: Record<string, string> = {};
+      for (const child of selectedChildren) {
+        const ageMonths =
+          child.birth_month && fieldValues.shot_date
+            ? computeAgeLabel(child.birth_month, fieldValues.shot_date).months
+            : null;
+        const formData = childFieldValues[child.id] ?? {};
+        const existingRowId = submissionChildRowIds[child.id];
+
+        let rowId = existingRowId;
+        if (existingRowId) {
+          const { error } = await supabase
+            .from('submission_children')
+            .update({ age_months: ageMonths, form_data: formData })
+            .eq('id', existingRowId);
+          if (error) throw new Error('子ども情報の保存に失敗しました');
+        } else {
+          const { data, error } = await supabase
+            .from('submission_children')
+            .insert({ submission_id: subId, child_id: child.id, age_months: ageMonths, form_data: formData })
+            .select('id')
+            .single();
+          if (error || !data) throw new Error('子ども情報の保存に失敗しました');
+          rowId = data.id;
+        }
+        nextRowIds[child.id] = rowId!;
+
+        const { error: clearVariantsError } = await supabase
+          .from('submission_child_variants')
+          .delete()
+          .eq('submission_child_id', rowId);
+        if (clearVariantsError) throw new Error('着用バリエーションの保存に失敗しました');
+
+        const variantIds = childVariantIds[child.id] ?? [];
+        if (variantIds.length > 0) {
+          const { error: cvError } = await supabase
+            .from('submission_child_variants')
+            .insert(variantIds.map((variantId) => ({ submission_child_id: rowId!, variant_id: variantId })));
+          if (cvError) throw new Error('着用バリエーションの保存に失敗しました');
+        }
+      }
+      setSubmissionChildRowIds(nextRowIds);
 
       if (doneFiles.length > 0) {
         const { error: filesError } = await supabase.from('submission_files').insert(
@@ -489,9 +616,9 @@ export default function SubmissionForm() {
       <Text className="font-body text-caption text-ink-soft mb-1">
         {cycleLabel} ・ {formatDueDate(taskDueDate)}まで
       </Text>
-      {skuInfo.length > 0 && (
+      {campaignVariants.length > 0 && (
         <Text className="font-body text-caption text-ink-soft mb-4">
-          {skuInfo.map((s) => [s.sku, s.size, s.color].filter(Boolean).join(' / ')).join(' , ')}
+          {campaignVariants.map(variantLabel).join(' , ')}
         </Text>
       )}
 
@@ -572,49 +699,121 @@ export default function SubmissionForm() {
       )}
 
       <Text className="font-body-medium text-body text-ink mb-2 mt-4">提出内容</Text>
-      {fieldDefs.map((f) => {
-        const value = fieldValues[f.key] ?? '';
-        if (f.input_type === 'select' && f.options) {
-          return (
-            <View key={f.key} className="mb-4">
-              <Text className="font-body text-caption text-ink-soft mb-1">{f.label}</Text>
-              <View className="flex-row flex-wrap" style={{ gap: 8 }}>
-                {f.options.map((opt) => (
-                  <Pressable
-                    key={opt}
-                    disabled={readOnly}
-                    onPress={() => setFieldValue(f.key, opt)}
-                    className={`rounded-control border px-3 py-2 ${
-                      value === opt ? 'border-accent bg-accent' : 'border-line bg-surface'
-                    }`}
-                  >
-                    <Text className={`font-body text-caption ${value === opt ? 'text-white' : 'text-ink'}`}>
-                      {opt}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          );
-        }
 
+      {shotDateField && (
+        <CalendarPicker
+          label={shotDateField.label}
+          mode="date"
+          value={fieldValues.shot_date || null}
+          onChange={(v) => setFieldValue('shot_date', v)}
+          editable={!readOnly}
+          maxDate={todayDateString()}
+        />
+      )}
+
+      <Text className="font-body-medium text-body text-ink mb-2 mt-2">対象の子ども(複数選択可)</Text>
+      {children.length === 0 ? (
+        <Text className="font-body text-caption text-ink-soft mb-4">
+          子どもが登録されていません。プロフィール画面から登録してください。
+        </Text>
+      ) : (
+        <View className="flex-row flex-wrap mb-4" style={{ gap: 8 }}>
+          {children.map((child) => {
+            const selected = selectedChildIds.includes(child.id);
+            return (
+              <Pressable
+                key={child.id}
+                disabled={readOnly}
+                onPress={() => toggleChild(child.id)}
+                className={`rounded-full border px-4 py-2 ${
+                  selected ? 'border-accent bg-accent' : 'border-line bg-surface'
+                }`}
+              >
+                <Text className={`font-body text-caption ${selected ? 'text-white' : 'text-ink'}`}>
+                  {child.call_name}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
+      {selectedChildren.map((child) => {
+        const ageInfo =
+          child.birth_month && fieldValues.shot_date
+            ? computeAgeLabel(child.birth_month, fieldValues.shot_date)
+            : null;
         return (
-          <View key={f.key}>
-            <TextField
-              label={`${f.label}${f.unit ? `(${f.unit})` : ''}`}
-              value={value}
-              onChangeText={(text) => setFieldValue(f.key, text)}
-              editable={!readOnly}
-              keyboardType={f.input_type === 'number' ? 'decimal-pad' : 'default'}
-              placeholder={f.input_type === 'date' ? 'YYYY-MM-DD' : undefined}
-              multiline={f.key === 'memo'}
-              numberOfLines={f.key === 'memo' ? 3 : undefined}
-            />
-            {f.key === 'age_months' && childBirthMonth && fieldValues.shot_date && (
-              <Text className="font-body text-tiny text-ink-soft -mt-3 mb-3">
-                {computeAgeDisplay(childBirthMonth, fieldValues.shot_date).label}
-              </Text>
+          <View key={child.id} className="bg-surface rounded-card border-hairline border-line p-4 mb-3">
+            <Text className="font-body-medium text-body text-ink mb-1">{child.call_name}</Text>
+            <Text className="font-body text-caption text-ink-soft mb-3">
+              {ageInfo ? `撮影時点: ${ageInfo.label}` : '撮影日を選択すると年齢が表示されます'}
+            </Text>
+
+            {campaignVariants.length > 0 && (
+              <View className="mb-3">
+                <Text className="font-body text-caption text-ink-soft mb-1">着用したカラー/サイズ</Text>
+                <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+                  {campaignVariants.map((v) => {
+                    const selected = (childVariantIds[child.id] ?? []).includes(v.id);
+                    return (
+                      <Pressable
+                        key={v.id}
+                        disabled={readOnly}
+                        onPress={() => toggleChildVariant(child.id, v.id)}
+                        className={`rounded-control border px-3 py-2 ${
+                          selected ? 'border-accent bg-accent' : 'border-line bg-bg'
+                        }`}
+                      >
+                        <Text className={`font-body text-caption ${selected ? 'text-white' : 'text-ink'}`}>
+                          {variantLabel(v)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
             )}
+
+            {childFieldDefs.map((f) => {
+              const value = childFieldValues[child.id]?.[f.key] ?? '';
+              if (f.input_type === 'select' && f.options) {
+                return (
+                  <View key={f.key} className="mb-3">
+                    <Text className="font-body text-caption text-ink-soft mb-1">{f.label}</Text>
+                    <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+                      {f.options.map((opt) => (
+                        <Pressable
+                          key={opt}
+                          disabled={readOnly}
+                          onPress={() => setChildFieldValue(child.id, f.key, opt)}
+                          className={`rounded-control border px-3 py-2 ${
+                            value === opt ? 'border-accent bg-accent' : 'border-line bg-bg'
+                          }`}
+                        >
+                          <Text className={`font-body text-caption ${value === opt ? 'text-white' : 'text-ink'}`}>
+                            {opt}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                );
+              }
+
+              return (
+                <TextField
+                  key={f.key}
+                  label={`${f.label}${f.unit ? `(${f.unit})` : ''}`}
+                  value={value}
+                  onChangeText={(text) => setChildFieldValue(child.id, f.key, text)}
+                  editable={!readOnly}
+                  keyboardType={f.input_type === 'number' ? 'decimal-pad' : 'default'}
+                  multiline={f.key === 'memo'}
+                  numberOfLines={f.key === 'memo' ? 3 : undefined}
+                />
+              );
+            })}
           </View>
         );
       })}

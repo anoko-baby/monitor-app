@@ -5,7 +5,7 @@ import { ActivityIndicator, Image, Linking, Modal, Pressable, ScrollView, Text, 
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { TextField } from '../components/TextField';
-import { formatCampaignNo, formatCycleFolderName, monitorDisplayName } from '../lib/campaigns';
+import { formatAgeMonths, formatCampaignNo, formatCycleFolderName, monitorDisplayName } from '../lib/campaigns';
 import { createDropboxSharedLink } from '../lib/dropbox';
 import { getThumbnailSignedUrl } from '../lib/mediaPipeline';
 import { supabase } from '../lib/supabase';
@@ -20,6 +20,14 @@ type FileRow = {
 };
 
 type FieldAnswer = { label: string; value: string };
+
+type ChildAnswerRow = {
+  childId: string;
+  callName: string;
+  ageMonths: number | null;
+  variantLabels: string[];
+  fieldAnswers: FieldAnswer[];
+};
 
 type ReviewLogRow = {
   id: string;
@@ -55,7 +63,8 @@ export default function AdminSubmissionDetail() {
   const [skuInfo, setSkuInfo] = useState<{ sku: string | null; size: string | null; color: string | null }[]>([]);
   const [dropboxFolderPath, setDropboxFolderPath] = useState<string | null>(null);
 
-  const [fieldAnswers, setFieldAnswers] = useState<FieldAnswer[]>([]);
+  const [shotDate, setShotDate] = useState<string | null>(null);
+  const [childAnswers, setChildAnswers] = useState<ChildAnswerRow[]>([]);
   const [snsUrls, setSnsUrls] = useState<string[]>([]);
   const [memo, setMemo] = useState('');
   const [files, setFiles] = useState<FileRow[]>([]);
@@ -166,22 +175,69 @@ export default function AdminSubmissionDetail() {
     if (submission) {
       const formData = (submission.form_data as Record<string, string>) ?? {};
       setMemo(formData.memo ?? '');
+      setShotDate(formData.shot_date ?? null);
 
       if (task.type === 'media') {
         const { data: fieldRows } = await supabase
           .from('campaign_form_fields')
           .select('form_field_key, form_fields(key, label, unit, sort_order)')
           .eq('campaign_id', cycle.campaign_id);
-        const answers = (fieldRows ?? [])
+        const fieldMeta = (fieldRows ?? [])
           .map((r: any) => ({
+            key: r.form_fields.key,
             label: r.form_fields.label,
-            value: formData[r.form_fields.key] ?? '',
             unit: r.form_fields.unit,
             sortOrder: r.form_fields.sort_order,
           }))
-          .sort((a: any, b: any) => a.sortOrder - b.sortOrder)
-          .map((a: any) => ({ label: a.label, value: a.unit ? `${a.value}${a.unit}` : a.value }));
-        setFieldAnswers(answers);
+          .filter((f: any) => f.key !== 'shot_date' && f.key !== 'age_months')
+          .sort((a: any, b: any) => a.sortOrder - b.sortOrder);
+
+        const { data: scRows } = await supabase
+          .from('submission_children')
+          .select('id, child_id, age_months, form_data')
+          .eq('submission_id', submission.id);
+
+        const childIds = Array.from(new Set((scRows ?? []).map((r) => r.child_id)));
+        const { data: childRows } = childIds.length
+          ? await supabase.from('children').select('id, call_name').in('id', childIds)
+          : { data: [] as { id: string; call_name: string }[] };
+        const nameById = new Map((childRows ?? []).map((c) => [c.id, c.call_name]));
+
+        const scIds = (scRows ?? []).map((r) => r.id);
+        const { data: variantLinks2 } = scIds.length
+          ? await supabase.from('submission_child_variants').select('submission_child_id, variant_id').in('submission_child_id', scIds)
+          : { data: [] as { submission_child_id: string; variant_id: string }[] };
+        const variantIds2 = Array.from(new Set((variantLinks2 ?? []).map((v) => v.variant_id)));
+        const { data: variantsData2 } = variantIds2.length
+          ? await supabase.from('variants').select('id, sku, size, color').in('id', variantIds2)
+          : { data: [] as { id: string; sku: string | null; size: string | null; color: string | null }[] };
+        const variantById = new Map((variantsData2 ?? []).map((v) => [v.id, v]));
+        const variantIdsByScId = new Map<string, string[]>();
+        for (const link of variantLinks2 ?? []) {
+          variantIdsByScId.set(link.submission_child_id, [
+            ...(variantIdsByScId.get(link.submission_child_id) ?? []),
+            link.variant_id,
+          ]);
+        }
+
+        setChildAnswers(
+          (scRows ?? []).map((r) => {
+            const rowFormData = (r.form_data as Record<string, string>) ?? {};
+            return {
+              childId: r.child_id,
+              callName: nameById.get(r.child_id) ?? '(不明)',
+              ageMonths: r.age_months,
+              variantLabels: (variantIdsByScId.get(r.id) ?? []).map((vid) => {
+                const v = variantById.get(vid);
+                return v ? [v.color, v.size].filter(Boolean).join(' / ') || v.sku || '(商品)' : '(不明)';
+              }),
+              fieldAnswers: fieldMeta.map((f: any) => ({
+                label: f.label,
+                value: rowFormData[f.key] ? `${rowFormData[f.key]}${f.unit ?? ''}` : '',
+              })),
+            };
+          })
+        );
 
         const { data: filesData } = await supabase
           .from('submission_files')
@@ -383,11 +439,27 @@ export default function AdminSubmissionDetail() {
             ))}
           </View>
 
-          <Text className="font-body-medium text-body text-ink mb-2">フォーム回答</Text>
-          {fieldAnswers.map((a) => (
-            <View key={a.label} className="flex-row justify-between mb-1">
-              <Text className="font-body text-caption text-ink-soft">{a.label}</Text>
-              <Text className="font-body text-caption text-ink">{a.value || '-'}</Text>
+          {shotDate && (
+            <Text className="font-body text-caption text-ink-soft mb-3">撮影日: {shotDate}</Text>
+          )}
+
+          <Text className="font-body-medium text-body text-ink mb-2">子どもごとの提出内容</Text>
+          {childAnswers.length === 0 && (
+            <Text className="font-body text-caption text-ink-soft mb-4">子どもの情報はありません</Text>
+          )}
+          {childAnswers.map((c) => (
+            <View key={c.childId} className="bg-surface rounded-card border-hairline border-line p-4 mb-3">
+              <Text className="font-body-medium text-body text-ink mb-1">{c.callName}</Text>
+              <Text className="font-body text-caption text-ink-soft mb-2">
+                撮影時点: {formatAgeMonths(c.ageMonths)}
+                {c.variantLabels.length > 0 ? ` ・ ${c.variantLabels.join(' , ')}` : ''}
+              </Text>
+              {c.fieldAnswers.map((a) => (
+                <View key={a.label} className="flex-row justify-between mb-1">
+                  <Text className="font-body text-caption text-ink-soft">{a.label}</Text>
+                  <Text className="font-body text-caption text-ink">{a.value || '-'}</Text>
+                </View>
+              ))}
             </View>
           ))}
         </>
