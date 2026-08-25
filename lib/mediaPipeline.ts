@@ -81,19 +81,29 @@ function asciiToBytes(value: string): Uint8Array {
 async function stripGpsMetadata(fileUri: string): Promise<{ uri: string; blob: Blob | null }> {
   if (isWeb) {
     const blob = await fetchBlobWithRetry(fileUri);
-    const buffer = new Uint8Array(await blob.arrayBuffer());
+    try {
+      const buffer = new Uint8Array(await blob.arrayBuffer());
 
-    const read = async (size: number, offset: number): Promise<ArrayBuffer> => {
-      return buffer.buffer.slice(offset, offset + size);
-    };
-    const write = async (value: string, offset: number, encoding: string): Promise<void> => {
-      const bytes = encoding === 'base64' ? base64ToBytes(value) : asciiToBytes(value);
-      buffer.set(bytes, offset);
-    };
-    await removeLocation(fileUri, read, write);
+      const read = async (size: number, offset: number): Promise<ArrayBuffer> => {
+        return buffer.buffer.slice(offset, offset + size);
+      };
+      const write = async (value: string, offset: number, encoding: string): Promise<void> => {
+        const bytes = encoding === 'base64' ? base64ToBytes(value) : asciiToBytes(value);
+        buffer.set(bytes, offset);
+      };
+      await removeLocation(fileUri, read, write);
 
-    const newBlob = new Blob([buffer], { type: blob.type });
-    return { uri: URL.createObjectURL(newBlob), blob: newBlob };
+      const newBlob = new Blob([buffer], { type: blob.type });
+      return { uri: URL.createObjectURL(newBlob), blob: newBlob };
+    } catch (err) {
+      // 一部のファイル(特定の内部構造を持つPNG等)でGPS除去ライブラリのパース処理が例外を
+      // 投げることがある(WebKitでは詳細不明な"Type error"というメッセージになり、原因の
+      // 特定が困難)。GPS除去に失敗してもアップロード自体は継続できるよう、元のファイルの
+      // まま次の処理へ進める(スクリーンショット等そもそも位置情報を含まないケースが多く、
+      // 提出物が一切アップロードできなくなる方が実害が大きいため)
+      console.warn('GPS位置情報の除去に失敗しました。元のファイルのままアップロードを続行します', err);
+      return { uri: fileUri, blob };
+    }
   }
 
   const file = new File(fileUri);
@@ -110,10 +120,13 @@ async function stripGpsMetadata(fileUri: string): Promise<{ uri: string; blob: B
       handle.writeBytes(bytes);
     };
     await removeLocation(fileUri, read, write);
-    return { uri: fileUri, blob: null };
+  } catch (err) {
+    // Web版と同様、GPS除去ライブラリの内部パース例外でアップロード自体がブロックされないようにする
+    console.warn('GPS位置情報の除去に失敗しました。元のファイルのままアップロードを続行します', err);
   } finally {
     handle.close();
   }
+  return { uri: fileUri, blob: null };
 }
 
 // HEICは選択時にJPEGへ変換してからGPS除去する(HEICのまま無劣化でGPSのみ除去する手段が無いため。
