@@ -80,11 +80,12 @@ async function searchOrderByQuery(
 // (検索インデックスを経由しないため、アーカイブ済みの古い注文も含まれる)を新しい順にページ送り
 // しながら、注文名が完全一致するものを探す。最大20ページ(5000件)まで。ページ送り中はid/nameのみ
 // の軽量クエリにして、一致した注文の詳細(lineItems等)は見つかった後に1回だけ別途取得する。
+// 原因調査用にdebugも返す(不具合の切り分け後に削除予定)。
 async function findOrderByPagination(
   storeDomain: string,
   accessToken: string,
   targetName: string
-): Promise<ShopifyOrderNode | null> {
+): Promise<{ order: ShopifyOrderNode | null; debug: any }> {
   const listQuery = `
     query ListOrders($cursor: String) {
       orders(first: 250, after: $cursor, sortKey: ID, reverse: true) {
@@ -95,19 +96,38 @@ async function findOrderByPagination(
   `;
   let cursor: string | null = null;
   let matchedId: string | null = null;
+  const debug: any = { pages: [] };
   for (let page = 0; page < 20 && !matchedId; page++) {
     const result = await callShopifyGraphQL(storeDomain, accessToken, listQuery, { cursor });
-    if (!result.ok || result.json.errors?.length) return null;
+    if (!result.ok) {
+      debug.fetchError = await result.response.text();
+      return { order: null, debug };
+    }
+    if (result.json.errors?.length) {
+      debug.graphqlErrors = result.json.errors;
+      return { order: null, debug };
+    }
     const edges = result.json.data?.orders?.edges ?? [];
+    debug.pages.push({
+      count: edges.length,
+      firstName: edges[0]?.node.name ?? null,
+      lastName: edges[edges.length - 1]?.node.name ?? null,
+    });
     const match = edges.find((e: any) => e.node.name === targetName);
     if (match) {
       matchedId = match.node.id;
       break;
     }
-    if (!result.json.data?.orders?.pageInfo?.hasNextPage || edges.length === 0) return null;
+    if (!result.json.data?.orders?.pageInfo?.hasNextPage || edges.length === 0) {
+      debug.exhausted = true;
+      return { order: null, debug };
+    }
     cursor = edges[edges.length - 1].cursor;
   }
-  if (!matchedId) return null;
+  if (!matchedId) {
+    debug.pageLimitReached = true;
+    return { order: null, debug };
+  }
 
   const detailQuery = `
     query GetOrder($id: ID!) {
@@ -115,8 +135,11 @@ async function findOrderByPagination(
     }
   `;
   const detailResult = await callShopifyGraphQL(storeDomain, accessToken, detailQuery, { id: matchedId });
-  if (!detailResult.ok || detailResult.json.errors?.length) return null;
-  return detailResult.json.data?.order ?? null;
+  if (!detailResult.ok || detailResult.json.errors?.length) {
+    debug.detailError = detailResult.ok ? detailResult.json.errors : await detailResult.response.text();
+    return { order: null, debug };
+  }
+  return { order: detailResult.json.data?.order ?? null, debug };
 }
 
 Deno.serve(async (req: Request) => {
@@ -161,12 +184,19 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  const order = searchResult.order ?? (await findOrderByPagination(storeDomain, accessToken, targetName));
+  let order = searchResult.order;
+  let paginationDebug: any = null;
+  if (!order) {
+    const paginationResult = await findOrderByPagination(storeDomain, accessToken, targetName);
+    order = paginationResult.order;
+    paginationDebug = paginationResult.debug;
+  }
 
   if (!order) {
+    // 原因調査用: ページ送り探索の経過をそのまま含める(不具合の切り分け後に削除予定)。
     return new Response(
       JSON.stringify({
-        error: `注文が見つかりませんでした(注文番号: ${targetName})。Shopify管理画面でこの注文の「注文番号」の表記をご確認ください`,
+        error: `注文が見つかりませんでした(注文番号: ${targetName})。デバッグ情報: ${JSON.stringify(paginationDebug)}`,
       }),
       { status: 404, headers: corsHeaders }
     );
