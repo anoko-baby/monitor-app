@@ -130,7 +130,7 @@ export function SnsSubmissionFormContent({ taskId }: { taskId: string }) {
 
     setSubmitting(true);
     try {
-      const isResubmission = taskStatus === 'rejected';
+      const isResubmission = taskStatus !== 'pending';
       const newVersion = isResubmission ? version + 1 : version;
 
       let subId = submissionId;
@@ -195,8 +195,6 @@ export function SnsSubmissionFormContent({ taskId }: { taskId: string }) {
     );
   }
 
-  const readOnly = taskStatus === 'approved';
-
   return (
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
       <Text className="font-heading text-title text-ink mb-1">{campaignTitle}</Text>
@@ -211,12 +209,12 @@ export function SnsSubmissionFormContent({ taskId }: { taskId: string }) {
         </View>
       )}
 
-      {readOnly && (
+      {taskStatus === 'approved' && !submitted && (
         <Text className="font-body text-caption text-status-approved mb-4">
-          確認済みのため編集できません
+          確認済みです。追加で提出することもできます
         </Text>
       )}
-      {submitted && !readOnly && (
+      {submitted && (
         <Text className="font-body-medium text-caption text-accent-ink mb-4">提出しました</Text>
       )}
 
@@ -227,12 +225,11 @@ export function SnsSubmissionFormContent({ taskId }: { taskId: string }) {
               label={`投稿URL${urls.length > 1 ? `(${index + 1})` : ''}`}
               value={url}
               onChangeText={(text) => updateUrl(index, text)}
-              editable={!readOnly}
               placeholder="https://"
               autoCapitalize="none"
             />
           </View>
-          {!readOnly && urls.length > 1 && (
+          {urls.length > 1 && (
             <Pressable onPress={() => removeUrlField(index)} className="mb-4">
               <Text className="font-body text-caption text-status-overdue">削除</Text>
             </Pressable>
@@ -240,30 +237,21 @@ export function SnsSubmissionFormContent({ taskId }: { taskId: string }) {
         </View>
       ))}
 
-      {!readOnly && urls.length < MAX_URLS && (
+      {urls.length < MAX_URLS && (
         <Pressable onPress={addUrlField} className="mb-4">
           <Text className="font-body text-caption text-accent-ink">+ URLを追加する</Text>
         </Pressable>
       )}
 
-      <TextField
-        label="メモ(任意)"
-        value={memo}
-        onChangeText={setMemo}
-        editable={!readOnly}
-        multiline
-        numberOfLines={3}
-      />
+      <TextField label="メモ(任意)" value={memo} onChangeText={setMemo} multiline numberOfLines={3} />
 
       {submitError && <ErrorBanner message={submitError} />}
 
-      {!readOnly && (
-        <AppButton
-          label={submitting ? '送信中…' : '提出する'}
-          onPress={handleSubmit}
-          loading={submitting}
-        />
-      )}
+      <AppButton
+        label={submitting ? '送信中…' : taskStatus === 'approved' ? '追加で提出する' : '提出する'}
+        onPress={handleSubmit}
+        loading={submitting}
+      />
     </ScrollView>
   );
 }

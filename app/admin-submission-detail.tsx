@@ -12,6 +12,7 @@ import {
   formatCampaignNo,
   formatCycleFolderName,
   monitorDisplayName,
+  variantLabel,
 } from '../lib/campaigns';
 import { createDropboxSharedLink } from '../lib/dropbox';
 import { getThumbnailSignedUrl } from '../lib/mediaPipeline';
@@ -67,7 +68,9 @@ export function AdminSubmissionDetailContent({ taskId }: { taskId: string }) {
   const [campaignTitle, setCampaignTitle] = useState('');
   const [monitorName, setMonitorName] = useState('');
   const [cycleLabel, setCycleLabel] = useState('');
-  const [skuInfo, setSkuInfo] = useState<{ sku: string | null; size: string | null; color: string | null }[]>([]);
+  const [skuInfo, setSkuInfo] = useState<
+    { title: string | null; sku: string | null; size: string | null; color: string | null }[]
+  >([]);
   const [dropboxFolderPath, setDropboxFolderPath] = useState<string | null>(null);
 
   const [shotDate, setShotDate] = useState<string | null>(null);
@@ -168,7 +171,7 @@ export function AdminSubmissionDetailContent({ taskId }: { taskId: string }) {
     if (variantLinks && variantLinks.length > 0) {
       const { data: variantsData } = await supabase
         .from('variants')
-        .select('sku, size, color')
+        .select('title, sku, size, color')
         .in('id', variantLinks.map((v) => v.variant_id));
       setSkuInfo(variantsData ?? []);
     }
@@ -216,8 +219,16 @@ export function AdminSubmissionDetailContent({ taskId }: { taskId: string }) {
           : { data: [] as { submission_child_id: string; variant_id: string }[] };
         const variantIds2 = Array.from(new Set((variantLinks2 ?? []).map((v) => v.variant_id)));
         const { data: variantsData2 } = variantIds2.length
-          ? await supabase.from('variants').select('id, sku, size, color').in('id', variantIds2)
-          : { data: [] as { id: string; sku: string | null; size: string | null; color: string | null }[] };
+          ? await supabase.from('variants').select('id, title, sku, size, color').in('id', variantIds2)
+          : {
+              data: [] as {
+                id: string;
+                title: string | null;
+                sku: string | null;
+                size: string | null;
+                color: string | null;
+              }[],
+            };
         const variantById = new Map((variantsData2 ?? []).map((v) => [v.id, v]));
         const variantIdsByScId = new Map<string, string[]>();
         for (const link of variantLinks2 ?? []) {
@@ -236,7 +247,7 @@ export function AdminSubmissionDetailContent({ taskId }: { taskId: string }) {
               ageMonths: r.age_months,
               variantLabels: (variantIdsByScId.get(r.id) ?? []).map((vid) => {
                 const v = variantById.get(vid);
-                return v ? [v.color, v.size].filter(Boolean).join(' / ') || v.sku || '(商品)' : '(不明)';
+                return v ? variantLabel(v) : '(不明)';
               }),
               fieldAnswers: fieldMeta.map((f: any) => ({
                 label: f.label,
@@ -410,7 +421,7 @@ export function AdminSubmissionDetailContent({ taskId }: { taskId: string }) {
 
       {skuInfo.length > 0 && taskType === 'media' && (
         <Text className="font-body text-caption text-ink-soft mb-4">
-          {skuInfo.map((s) => [s.sku, s.size, s.color].filter(Boolean).join(' / ')).join(' , ')}
+          {skuInfo.map((s) => variantLabel(s)).join(' , ')}
         </Text>
       )}
 

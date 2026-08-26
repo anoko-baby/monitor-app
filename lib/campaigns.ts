@@ -36,6 +36,21 @@ export function suggestCampaignTitle(productLabel: string, monitorName: string):
   return `${productLabel} モニター(${monitorName}様)`;
 }
 
+// バリエーションの表示名。SKU(商品番号)は見ただけでは何を指すかわからないため、
+// Shopifyのバリエーション名(title、例:「フリー」「S / ピンク」)を優先し、無ければ
+// サイズ・カラーの組み合わせ、それも無ければSKUにフォールバックする(実機フィードバック)。
+export function variantLabel(v: {
+  title?: string | null;
+  sku?: string | null;
+  size?: string | null;
+  color?: string | null;
+}): string {
+  if (v.title) return v.title;
+  const sizeColor = [v.color, v.size].filter(Boolean).join(' / ');
+  if (sizeColor) return sizeColor;
+  return v.sku || '(バリエーション)';
+}
+
 // モニターの表示名。招待直後(本登録前)はnameがnullなのでinstagram_handleにフォールバックする。
 // supabase/functions/_shared/profiles.ts の monitorDisplayName と同じロジック(要同期)。
 export function monitorDisplayName(m: { name: string | null; instagramHandle?: string | null } | null | undefined): string {

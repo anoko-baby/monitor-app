@@ -607,6 +607,28 @@ Dropbox連携先の切り替え作業中に試行された提出ファイル(`IM
 - **注記**: この規約文面はドラフトとして作成したもの。実際にアプリ配信・ストア審査に使う前に、必要であれば弁護士等専門家によるレビューを推奨する
 - `npx tsc --noEmit`通過。アプリコードのみの変更で、DB/Edge Functionの変更は無い
 
+## バリエーション名がSKU番号のまま表示される不具合を修正、案件登録の日付をカレンダー選択に統一(2026-08-26)
+
+- 実機フィードバック: 「バリエーションについて、SKUを表示してもなんのことかわからないから、バリエーション名を表示してほしい(この画面に限らず案件登録時なども)」
+- 原因: 商品検索・注文取込の際、Shopifyのオプション名が「size」「サイズ」「color」「カラー」等の決まった名前と一致する場合しかサイズ・カラーを抽出しておらず、それ以外の商品(オプション名が独自のもの、または単一バリエーションの商品)ではサイズ・カラーが空になり、SKU番号だけが表示されていた
+- 対応: Shopify側が自動生成する人間可読なバリエーション名(`variant.title`。例:「フリー」「S / ピンク」)をそのまま取得・保存・表示する方式に変更
+  - `variants`テーブルに`title`列を追加(`supabase/migrations/20260826000003_variant_title.sql`)
+  - `shopify-product-search`・`shopify-order-lookup`の両Edge Functionで`variant.title`を取得し、Shopify既定値の「Default Title」の場合はnullとして返すようにした
+  - `lib/campaigns.ts`に共通の`variantLabel()`ヘルパーを新設(優先順位: バリエーション名 → サイズ/カラー → SKU)。案件登録画面・案件詳細・提出フォーム・提出確認画面など、バリエーションを表示している全箇所をこのヘルパーに統一
+  - 既に登録済みの商品は`title`が空のままなので反映されない問題への対応として、Shopifyから再取得する一度きりの管理者用ツール(`shopify-resync-variant-titles` Edge Function)を新設し、案件一覧画面に「バリエーション名を再取得」ボタンを追加した
+- 合わせて、案件登録時の提出期限日・開始月・SNS投稿期限日の入力を、手入力(YYYY-MM-DD形式のテキスト欄)からカレンダー選択(既存の`CalendarPicker`コンポーネント。撮影日・子どもの生年月で使っているものと同じ)に統一した(実機フィードバック: 「案件登録時の期限などの設定時のカレンダー表示もお願い」)
+- `npx tsc --noEmit`通過。**要マイグレーション適用(`npx supabase db push`)・要Edge Functionの再デプロイ**(`shopify-product-search`・`shopify-order-lookup`・新規の`shopify-resync-variant-titles`の3つ)。デプロイ後、案件一覧の「バリエーション名を再取得」ボタンを一度押してもらうと、登録済みの商品にもバリエーション名が反映される
+
+## 確認済み(approved)の提出も追加提出を何度でもできるように変更(2026-08-26)
+
+- 実機フィードバック: 「提出済みの案件について、追加提出が何度でもできるようにもしたい」
+- これまでは`app/submission-form.tsx`・`app/sns-submission-form.tsx`とも、タスクが「確認済み(approved)」になった時点で画面全体が編集不可(`readOnly`)になり、それ以上ファイルを追加したり内容を編集したりできなかった
+- 対応: `readOnly`による画面ロックを撤廃し、確認済みの提出でも写真・動画の追加やURL・メモの編集を随時行えるようにした。追加提出すると、タスクのstatusは自動的に「確認待ち(submitted)」に戻り、管理側の再確認対象になる(仕組みは差し戻し後の再提出と同じ)
+- 提出済みボタンのラベルは、確認済みの状態から追加提出する場合のみ「追加で提出する」に変更(それ以外は従来通り「提出する」)
+- 既に一度提出したファイルの削除は引き続きできない(pending・rejectedの時のみ削除可、という既存ルールは変更していない)。今回追加できるのは新しいファイルの「追加」のみ
+- **重要**: 画面側だけでなく、`tasks`/`submissions`/`submission_files`/`submission_children`/`submission_child_variants`へのモニターからのINSERT/UPDATE系RLSポリシーが、いずれも「status <> 'approved'」の場合のみ許可する条件になっていたため、画面を編集可能にしただけではRLS違反で保存に失敗する状態だった。`supabase/migrations/20260826000004_allow_resubmission_after_approval.sql`で、該当ポリシーの条件を「cancelledでなければ許可」に緩和した(承認取り消し等の運用は無いため、approvedを弾いていた制約はcancelledのみに絞って問題ない)
+- `npx tsc --noEmit`通過。**要マイグレーション適用(`npx supabase db push`)**。Edge Functionの変更は無い
+
 ---
 
 ## 未確定・要確認事項の記録

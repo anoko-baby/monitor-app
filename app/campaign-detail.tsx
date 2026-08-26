@@ -7,6 +7,7 @@ import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { HeroScreen } from '../components/HeroScreen';
 import { StatusPill } from '../components/StatusPill';
+import { variantLabel } from '../lib/campaigns';
 import { goBackOrReplace } from '../lib/navigation';
 import { supabase } from '../lib/supabase';
 
@@ -14,6 +15,7 @@ type ProductInfo = {
   title: string;
   brand: string | null;
   imageUrl: string | null;
+  variantTitle: string | null;
   sku: string | null;
   size: string | null;
   color: string | null;
@@ -96,7 +98,7 @@ export function CampaignDetailContent({
     if (variantLinks && variantLinks.length > 0) {
       const { data: variantsData } = await supabase
         .from('variants')
-        .select('sku, size, color, image_url, product_id')
+        .select('title, sku, size, color, image_url, product_id')
         .in('id', variantLinks.map((v) => v.variant_id));
       const productIds = Array.from(new Set((variantsData ?? []).map((v) => v.product_id)));
       const { data: productsData } = await supabase
@@ -108,6 +110,7 @@ export function CampaignDetailContent({
         title: productById.get(v.product_id)?.title ?? '商品名未設定',
         brand: productById.get(v.product_id)?.brand ?? null,
         imageUrl: v.image_url ?? productById.get(v.product_id)?.image_url ?? null,
+        variantTitle: v.title,
         sku: v.sku,
         size: v.size,
         color: v.color,
@@ -187,7 +190,7 @@ export function CampaignDetailContent({
               {p.title}
             </Text>
             <Text className="font-body text-caption text-ink-soft">
-              {[p.sku, p.size, p.color].filter(Boolean).join(' / ') || 'SKU未設定'}
+              {variantLabel({ title: p.variantTitle, sku: p.sku, size: p.size, color: p.color })}
             </Text>
           </View>
         </View>

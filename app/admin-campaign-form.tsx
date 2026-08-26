@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
+import { CalendarPicker } from '../components/CalendarPicker';
 import { CycleDots } from '../components/CycleDots';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { HeroScreen } from '../components/HeroScreen';
@@ -15,6 +16,7 @@ import {
   generateCyclesAndTasks,
   monitorDisplayName,
   suggestCampaignTitle,
+  variantLabel,
 } from '../lib/campaigns';
 import { goBackOrReplace } from '../lib/navigation';
 import { invokeEdgeFunction, supabase } from '../lib/supabase';
@@ -25,6 +27,7 @@ type ProductSelection = {
   shopifyVariantId: string | null;
   title: string;
   brand: string | null;
+  variantTitle: string | null;
   sku: string | null;
   size: string | null;
   color: string | null;
@@ -44,6 +47,7 @@ type FormFieldMaster = {
 
 type SearchVariant = {
   shopifyVariantId: string;
+  title: string | null;
   sku: string | null;
   size: string | null;
   color: string | null;
@@ -223,8 +227,9 @@ export function AdminCampaignFormContent({
           shopifyVariantId: li.variant_id ? `gid://shopify/ProductVariant/${li.variant_id}` : null,
           title: li.title ?? '商品名未設定',
           brand: null,
+          variantTitle: li.variant_title && li.variant_title !== 'Default Title' ? li.variant_title : null,
           sku: li.sku ?? null,
-          size: li.variant_title ?? null,
+          size: null,
           color: null,
           imageUrl: null,
         }));
@@ -305,6 +310,7 @@ export function AdminCampaignFormContent({
         shopifyVariantId: li.shopifyVariantId ?? null,
         title: li.productTitle ?? '商品名未設定',
         brand: li.brand ?? null,
+        variantTitle: li.variantTitle ?? null,
         sku: li.sku ?? null,
         size,
         color,
@@ -342,6 +348,7 @@ export function AdminCampaignFormContent({
           shopifyVariantId: variant.shopifyVariantId,
           title: product.title,
           brand: product.brand,
+          variantTitle: variant.title,
           sku: variant.sku,
           size: variant.size,
           color: variant.color,
@@ -361,6 +368,7 @@ export function AdminCampaignFormContent({
         shopifyVariantId: null,
         title: manualTitle,
         brand: manualBrand || null,
+        variantTitle: null,
         sku: manualSku || null,
         size: manualSize || null,
         color: manualColor || null,
@@ -486,6 +494,7 @@ export function AdminCampaignFormContent({
               {
                 shopify_variant_id: p.shopifyVariantId,
                 product_id: productId,
+                title: p.variantTitle,
                 sku: p.sku,
                 size: p.size,
                 color: p.color,
@@ -500,7 +509,7 @@ export function AdminCampaignFormContent({
         } else {
           const { data: variantRow, error: variantError } = await supabase
             .from('variants')
-            .insert({ product_id: productId, sku: p.sku, size: p.size, color: p.color })
+            .insert({ product_id: productId, title: p.variantTitle, sku: p.sku, size: p.size, color: p.color })
             .select('id')
             .single();
           if (variantError || !variantRow) throw new Error('バリアント情報の保存に失敗しました');
@@ -526,7 +535,7 @@ export function AdminCampaignFormContent({
       if (recurrenceType === 'monthly') {
         campaignInsert.media_deadline_day = parseInt(mediaDeadlineDay, 10);
         campaignInsert.cycles_count = parseInt(cyclesCount, 10);
-        campaignInsert.start_month = `${startMonth}-01`;
+        campaignInsert.start_month = startMonth;
       } else {
         campaignInsert.cycles_count = 1;
       }
@@ -576,7 +585,7 @@ export function AdminCampaignFormContent({
           : generateCyclesAndTasks({
               recurrenceType: 'monthly',
               cyclesCount: parseInt(cyclesCount, 10),
-              startMonth: `${startMonth}-01`,
+              startMonth,
               mediaDeadlineDay: parseInt(mediaDeadlineDay, 10),
               snsRequired,
               snsFrequency,
@@ -677,7 +686,7 @@ export function AdminCampaignFormContent({
     if (variantLinks && variantLinks.length > 0) {
       const { data: variantsData } = await supabase
         .from('variants')
-        .select('sku, product_id')
+        .select('title, sku, size, color, product_id')
         .in('id', variantLinks.map((v) => v.variant_id));
       const productIds = Array.from(new Set((variantsData ?? []).map((v) => v.product_id)));
       const { data: productsData } = await supabase
@@ -686,7 +695,11 @@ export function AdminCampaignFormContent({
         .in('id', productIds);
       const productById = new Map((productsData ?? []).map((p) => [p.id, p]));
       productSummary = (variantsData ?? [])
-        .map((v) => `${productById.get(v.product_id)?.title ?? '商品名未設定'}${v.sku ? ` (${v.sku})` : ''}`)
+        .map((v) => {
+          const label = variantLabel(v);
+          const productTitle = productById.get(v.product_id)?.title ?? '商品名未設定';
+          return label === '(バリエーション)' ? productTitle : `${productTitle} (${label})`;
+        })
         .join(' / ');
     }
 
@@ -947,7 +960,7 @@ export function AdminCampaignFormContent({
           <View className="flex-1">
             <Text className="font-body-medium text-body text-ink">✓ {p.title}</Text>
             <Text className="font-body text-caption text-ink-soft">
-              {[p.sku, p.size, p.color].filter(Boolean).join(' / ') || 'SKU未設定'}
+              {variantLabel({ title: p.variantTitle, sku: p.sku, size: p.size, color: p.color })}
             </Text>
           </View>
           <Pressable onPress={() => removeProduct(p.key)} hitSlop={8}>
@@ -1002,7 +1015,7 @@ export function AdminCampaignFormContent({
                   className={`${isSelected ? 'font-body-medium text-white' : 'font-body text-ink'} text-caption`}
                 >
                   {isSelected ? '✓ ' : ''}
-                  {[variant.sku, variant.size, variant.color].filter(Boolean).join(' / ')}
+                  {variantLabel(variant)}
                 </Text>
               </Pressable>
             );
@@ -1056,20 +1069,10 @@ export function AdminCampaignFormContent({
       </View>
 
       {recurrenceType === 'once' ? (
-        <TextField
-          label="提出期限日(YYYY-MM-DD)"
-          value={onceMediaDueDate}
-          onChangeText={setOnceMediaDueDate}
-          placeholder="2026-08-10"
-        />
+        <CalendarPicker label="提出期限日" value={onceMediaDueDate || null} onChange={setOnceMediaDueDate} mode="date" />
       ) : (
         <>
-          <TextField
-            label="開始月(YYYY-MM)"
-            value={startMonth}
-            onChangeText={setStartMonth}
-            placeholder="2026-08"
-          />
+          <CalendarPicker label="開始月" value={startMonth || null} onChange={setStartMonth} mode="month" />
           <TextField
             label="毎月◎日まで"
             value={mediaDeadlineDay}
@@ -1127,12 +1130,7 @@ export function AdminCampaignFormContent({
               keyboardType="number-pad"
             />
           ) : (
-            <TextField
-              label="SNS投稿期限日(YYYY-MM-DD)"
-              value={snsOnceDueDate}
-              onChangeText={setSnsOnceDueDate}
-              placeholder="2026-08-10"
-            />
+            <CalendarPicker label="SNS投稿期限日" value={snsOnceDueDate || null} onChange={setSnsOnceDueDate} mode="date" />
           )}
         </>
       )}

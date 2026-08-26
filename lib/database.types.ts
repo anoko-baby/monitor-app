@@ -1101,6 +1101,7 @@ export type Database = {
           shopify_variant_id: string | null
           size: string | null
           sku: string | null
+          title: string | null
           updated_at: string
         }
         Insert: {
@@ -1112,6 +1113,7 @@ export type Database = {
           shopify_variant_id?: string | null
           size?: string | null
           sku?: string | null
+          title?: string | null
           updated_at?: string
         }
         Update: {
@@ -1123,6 +1125,7 @@ export type Database = {
           shopify_variant_id?: string | null
           size?: string | null
           sku?: string | null
+          title?: string | null
           updated_at?: string
         }
         Relationships: [
