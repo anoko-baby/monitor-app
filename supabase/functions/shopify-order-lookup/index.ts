@@ -63,6 +63,10 @@ Deno.serve(async (req: Request) => {
     }
   `;
 
+  // Shopifyの注文検索クエリ(name:)は、注文名に含まれる「#」を検索語にも含めないと
+  // 一致しない(name:1001ではヒットせず、name:#1001でないとヒットしない仕様)。
+  // 入力欄には「#」ありなし両方で入力される可能性があるため、一旦取り除いてから
+  // 検索クエリ構築時に必ず付け直す。
   const normalizedOrderNumber = String(orderNumber).replace(/^#/, '');
 
   const response = await fetch(
@@ -73,7 +77,7 @@ Deno.serve(async (req: Request) => {
         'Content-Type': 'application/json',
         'X-Shopify-Access-Token': accessToken,
       },
-      body: JSON.stringify({ query: gqlQuery, variables: { query: `name:${normalizedOrderNumber}` } }),
+      body: JSON.stringify({ query: gqlQuery, variables: { query: `name:#${normalizedOrderNumber}` } }),
     }
   );
 
@@ -89,7 +93,7 @@ Deno.serve(async (req: Request) => {
   const order = json.data?.orders?.edges?.[0]?.node;
 
   if (!order) {
-    return new Response(JSON.stringify({ error: '注文が見つかりませんでした' }), {
+    return new Response(JSON.stringify({ error: `注文が見つかりませんでした(注文番号: #${normalizedOrderNumber})` }), {
       status: 404,
       headers: corsHeaders,
     });
