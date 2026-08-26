@@ -8,7 +8,7 @@ import { HeroProfileBadge } from '../components/HeroProfileBadge';
 import { HeroScreen } from '../components/HeroScreen';
 import { StatusPill } from '../components/StatusPill';
 import { CycleDotStatus, deriveCycleStatus, formatCampaignNo, monitorDisplayName } from '../lib/campaigns';
-import { supabase } from '../lib/supabase';
+import { invokeEdgeFunction, supabase } from '../lib/supabase';
 import { ADMIN_TAB_ITEMS } from '../lib/tabItems';
 import { AdminCampaignFormContent } from './admin-campaign-form';
 
@@ -37,6 +37,8 @@ export default function AdminCampaignList() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'active' | 'done'>('active');
   const [view, setView] = useState<SheetView>({ type: 'list' });
+  const [resyncing, setResyncing] = useState(false);
+  const [resyncMessage, setResyncMessage] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -92,6 +94,29 @@ export default function AdminCampaignList() {
     load();
   }
 
+  // 実機フィードバック対応: variants.title新設前に登録済みだった商品はバリエーション名が
+  // 空のままなので、Shopifyから再取得して埋める一度きりの管理者用ツール。
+  // 1回の呼び出しにつき最大250件処理するため、追加の対象が無くなるまで繰り返す。
+  async function handleResyncVariantTitles() {
+    setResyncing(true);
+    setResyncMessage(null);
+    let totalUpdated = 0;
+    for (let i = 0; i < 20; i++) {
+      const { data, errorMessage } = await invokeEdgeFunction<{ updated: number; skipped: number; total: number }>(
+        'shopify-resync-variant-titles'
+      );
+      if (errorMessage) {
+        setResyncMessage(`エラー: ${errorMessage}`);
+        setResyncing(false);
+        return;
+      }
+      totalUpdated += data?.updated ?? 0;
+      if (!data || data.total === 0 || data.updated === 0) break;
+    }
+    setResyncMessage(`${totalUpdated}件のバリエーション名を更新しました`);
+    setResyncing(false);
+  }
+
   const visibleCampaigns = campaigns.filter((c) => (activeTab === 'active' ? c.status === 'active' : c.status !== 'active'));
 
   return (
@@ -118,11 +143,19 @@ export default function AdminCampaignList() {
           <AdminCampaignFormContent id={view.id} onSaved={backToList} />
         ) : (
           <View className="flex-1 px-6 pt-4">
-            <View className="flex-row justify-end mb-2">
+            <View className="flex-row justify-end items-center mb-1" style={{ gap: 16 }}>
+              <Pressable onPress={handleResyncVariantTitles} disabled={resyncing}>
+                <Text className="font-body text-caption text-ink-soft">
+                  {resyncing ? '商品名を更新中…' : 'バリエーション名を再取得'}
+                </Text>
+              </Pressable>
               <Pressable onPress={() => setView({ type: 'create' })}>
                 <Text className="font-body-medium text-body text-accent-ink">+ 新規案件</Text>
               </Pressable>
             </View>
+            {resyncMessage && (
+              <Text className="font-body text-tiny text-ink-soft mb-2 text-right">{resyncMessage}</Text>
+            )}
 
             {loadError && <ErrorBanner message={loadError} />}
             {loading && <Text className="font-body text-caption text-ink-soft">読み込み中…</Text>}

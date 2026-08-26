@@ -19,6 +19,7 @@ const ORDER_FIELDS = `
         quantity
         variant {
           id
+          title
           selectedOptions { name value }
           product { title vendor featuredImage { url } }
         }
@@ -249,6 +250,8 @@ Deno.serve(async (req: Request) => {
         productTitle: e.node.variant?.product?.title,
         brand: e.node.variant?.product?.vendor,
         imageUrl: e.node.variant?.product?.featuredImage?.url ?? null,
+        variantTitle:
+          e.node.variant?.title && e.node.variant.title !== 'Default Title' ? e.node.variant.title : null,
         selectedOptions: e.node.variant?.selectedOptions,
       })),
     }),

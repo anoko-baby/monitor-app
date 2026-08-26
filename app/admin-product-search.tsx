@@ -5,11 +5,13 @@ import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { HeroScreen } from '../components/HeroScreen';
 import { TextField } from '../components/TextField';
+import { variantLabel } from '../lib/campaigns';
 import { goBackOrReplace } from '../lib/navigation';
 import { invokeEdgeFunction } from '../lib/supabase';
 
 type Variant = {
   shopifyVariantId: string;
+  title: string | null;
   sku: string | null;
   size: string | null;
   color: string | null;
@@ -97,7 +99,7 @@ export function AdminProductSearchContent() {
             </View>
             {item.variants.map((variant) => (
               <Text key={variant.shopifyVariantId} className="font-body text-caption text-ink-soft">
-                {[variant.sku, variant.size, variant.color].filter(Boolean).join(' / ')}
+                {variantLabel(variant)}
               </Text>
             ))}
           </View>

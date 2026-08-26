@@ -48,6 +48,7 @@ Deno.serve(async (req: Request) => {
               edges {
                 node {
                   id
+                  title
                   sku
                   selectedOptions { name value }
                   image { url }
@@ -102,6 +103,7 @@ Deno.serve(async (req: Request) => {
         const color = options.find((o) => /colou?r|カラー|色/i.test(o.name))?.value ?? null;
         return {
           shopifyVariantId: vNode.id,
+          title: vNode.title && vNode.title !== 'Default Title' ? vNode.title : null,
           sku: vNode.sku,
           size,
           color,

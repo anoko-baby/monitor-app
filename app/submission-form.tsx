@@ -15,6 +15,7 @@ import {
   formatCycleFolderName,
   formatSubmissionFileName,
   todayDateString,
+  variantLabel,
 } from '../lib/campaigns';
 import { getThumbnailSignedUrl, processAndUploadFile } from '../lib/mediaPipeline';
 import { goBackOrReplace } from '../lib/navigation';
@@ -36,7 +37,7 @@ type FieldDef = {
 };
 
 type ChildOption = { id: string; call_name: string; birth_month: string | null };
-type VariantOption = { id: string; sku: string | null; size: string | null; color: string | null };
+type VariantOption = { id: string; title: string | null; sku: string | null; size: string | null; color: string | null };
 
 type ExistingFile = {
   id: string;
@@ -49,10 +50,6 @@ type ExistingFile = {
 function formatDueDate(dateStr: string): string {
   const [, month, day] = dateStr.split('-');
   return `${parseInt(month, 10)}月${parseInt(day, 10)}日`;
-}
-
-function variantLabel(v: VariantOption): string {
-  return [v.color, v.size].filter(Boolean).join(' / ') || v.sku || '(商品)';
 }
 
 // モニター側 データ提出フォームの本体(仕様書 v1.8 画面一覧6)。ファイル選択+動的フォーム項目+
@@ -184,7 +181,7 @@ export function SubmissionFormContent({ taskId }: { taskId: string }) {
     if (variantLinks && variantLinks.length > 0) {
       const { data: variantsData } = await supabase
         .from('variants')
-        .select('id, sku, size, color')
+        .select('id, title, sku, size, color')
         .in('id', variantLinks.map((v) => v.variant_id));
       setCampaignVariants(variantsData ?? []);
     }
