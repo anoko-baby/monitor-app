@@ -656,6 +656,12 @@ Dropbox連携先の切り替え作業中に試行された提出ファイル(`IM
 - 必須表示: `components/TextField.tsx`・`components/PrefecturePicker.tsx`に`required`propを追加し、ラベルの末尾に赤い(`text-status-overdue`)「*」を表示するようにした。`app/register.tsx`の「(必須)」というテキスト表記をこの`required` propに置き換えた
 - `npx tsc --noEmit`通過。アプリコードのみの変更で、DB/Edge Functionの変更は無い
 
+## 管理画面の案件編集で商品サムネイルを表示(2026-08-26)
+
+- 実機フィードバック: 「案件詳細で商品のサムネイル表示させたいかも」
+- `app/admin-campaign-form.tsx`の編集モード(案件一覧から案件をタップした画面)で、これまでテキストのみだった商品情報を、商品ごとに画像(40x40、未設定時は「-」)+バリエーション名の行に変更した(モニター側の案件詳細で先に対応した表示形式と揃えた)
+- `npx tsc --noEmit`通過。アプリコードのみの変更で、DB/Edge Functionの変更は無い
+
 ---
 
 ## 未確定・要確認事項の記録
