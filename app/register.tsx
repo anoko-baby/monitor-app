@@ -68,31 +68,35 @@ export default function Register() {
         <TextField label="Instagramアカウント名(招待時の登録内容・変更不可)" value={`@${instagramHandle}`} editable={false} />
       )}
 
-      <TextField label="氏名(必須)" value={name} onChangeText={setName} />
-      <PrefecturePicker label="都道府県(必須)" value={prefecture} onChange={setPrefecture} />
+      <TextField label="氏名" required value={name} onChangeText={setName} />
+      <PrefecturePicker label="都道府県" required value={prefecture} onChange={setPrefecture} />
       <TextField
-        label="電話番号(必須)"
+        label="電話番号"
+        required
         value={phone}
         onChangeText={setPhone}
         keyboardType="phone-pad"
         placeholder="09012345678"
       />
       <TextField
-        label="メールアドレス(必須)"
+        label="メールアドレス"
+        required
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
       />
       <TextField
-        label="パスワード(8文字以上・必須)"
+        label="パスワード(8文字以上)"
+        required
         value={password}
         onChangeText={setPassword}
         secureTextEntry
       />
       <View className="mb-6">
         <TextField
-          label="パスワード(確認用・必須)"
+          label="パスワード(確認用)"
+          required
           value={passwordConfirm}
           onChangeText={setPasswordConfirm}
           secureTextEntry

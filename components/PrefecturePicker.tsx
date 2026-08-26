@@ -58,14 +58,18 @@ type Props = {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  required?: boolean;
 };
 
-export function PrefecturePicker({ label, value, onChange, placeholder }: Props) {
+export function PrefecturePicker({ label, value, onChange, placeholder, required }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
     <View className="mb-4">
-      <Text className="font-body text-caption text-ink-soft mb-1">{label}</Text>
+      <Text className="font-body text-caption text-ink-soft mb-1">
+        {label}
+        {required && <Text className="text-status-overdue"> *</Text>}
+      </Text>
       <Pressable
         onPress={() => setOpen(true)}
         className="font-body bg-surface border border-line rounded-control px-4 py-3"

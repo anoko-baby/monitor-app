@@ -1,12 +1,28 @@
+import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Platform, ScrollView, Switch, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { registerPushTokenForCurrentUser } from '../lib/push';
 import { supabase } from '../lib/supabase';
+
+// トグルだと「同意している状態」がぱっと見でわかりにくいとの実機フィードバックを受け、
+// チェックボックス(✓)に変更した。
+function ConsentCheckbox({ label, checked, onToggle }: { label: string; checked: boolean; onToggle: () => void }) {
+  return (
+    <Pressable onPress={onToggle} className="flex-row items-center mb-4" style={{ gap: 10 }}>
+      <Ionicons
+        name={checked ? 'checkbox' : 'square-outline'}
+        size={24}
+        color={checked ? '#4E5B54' : '#B7AE9E'}
+      />
+      <Text className="font-body text-body text-ink flex-1">{label}</Text>
+    </Pressable>
+  );
+}
 
 const TOS_SECTIONS: { heading: string; body: string }[] = [
   {
@@ -113,26 +129,25 @@ export default function Consent() {
       </View>
 
       <Text className="font-body-medium text-body text-ink mb-2">
-        写真・動画の掲載範囲について、ご同意いただける項目を選択してください
+        以下すべてにチェックのうえ、ご同意ください(モニターへのご協力には全項目への同意が必要です)
       </Text>
 
-      <View className="flex-row items-center justify-between mb-4">
-        <Text className="font-body text-body text-ink flex-1 pr-4">
-          写真・動画をECサイトに掲載してもよい
-        </Text>
-        <Switch value={consentEc} onValueChange={setConsentEc} />
-      </View>
-      <View className="flex-row items-center justify-between mb-4">
-        <Text className="font-body text-body text-ink flex-1 pr-4">
-          写真・動画をSNSに掲載してもよい
-        </Text>
-        <Switch value={consentSns} onValueChange={setConsentSns} />
-      </View>
-      <View className="flex-row items-center justify-between mb-8">
-        <Text className="font-body text-body text-ink flex-1 pr-4">
-          写真・動画を広告に利用してもよい
-        </Text>
-        <Switch value={consentAd} onValueChange={setConsentAd} />
+      <ConsentCheckbox
+        label="写真・動画をECサイトに掲載することに同意する"
+        checked={consentEc}
+        onToggle={() => setConsentEc((v) => !v)}
+      />
+      <ConsentCheckbox
+        label="写真・動画をSNSに掲載することに同意する"
+        checked={consentSns}
+        onToggle={() => setConsentSns((v) => !v)}
+      />
+      <View className="mb-8">
+        <ConsentCheckbox
+          label="写真・動画を広告に利用することに同意する"
+          checked={consentAd}
+          onToggle={() => setConsentAd((v) => !v)}
+        />
       </View>
 
       {notifDenied && (
@@ -142,6 +157,7 @@ export default function Consent() {
       <AppButton
         label={submitting ? '処理中…' : '同意して次へ'}
         onPress={handleAgree}
+        disabled={!consentEc || !consentSns || !consentAd}
         loading={submitting}
       />
     </ScrollView>
