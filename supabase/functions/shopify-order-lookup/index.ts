@@ -193,11 +193,18 @@ Deno.serve(async (req: Request) => {
   }
 
   if (!order) {
-    // 原因調査用: ページ送り探索の経過をそのまま含める(不具合の切り分け後に削除予定)。
+    // ページ送りが「もう古い注文は無い」(exhausted)で終わった場合、実際にはまだ古い注文が
+    // 存在するはずなのに打ち切られているため、Shopifyの標準権限(read_orders)による
+    // 「直近60日分の注文しかAPI経由で見えない」という制限に当たっている可能性が高い
+    // (要read_all_ordersスコープ)。確認できた最も古い注文番号をヒントとして伝える。
+    const oldestSeen = paginationDebug?.exhausted
+      ? paginationDebug.pages?.[paginationDebug.pages.length - 1]?.lastName
+      : null;
+    const scopeHint = oldestSeen
+      ? `Shopifyの標準権限(read_orders)では直近60日分の注文しかAPI経由で取得できません(現在API経由で確認できる最も古い注文: ${oldestSeen})。これより古い注文を取り込むには、Shopify側でアプリに「read_all_orders」権限を追加していただくか、商品を手動で選択してください。`
+      : 'Shopify管理画面でこの注文の「注文番号」の表記をご確認ください。';
     return new Response(
-      JSON.stringify({
-        error: `注文が見つかりませんでした(注文番号: ${targetName})。デバッグ情報: ${JSON.stringify(paginationDebug)}`,
-      }),
+      JSON.stringify({ error: `注文が見つかりませんでした(注文番号: ${targetName})。${scopeHint}` }),
       { status: 404, headers: corsHeaders }
     );
   }
