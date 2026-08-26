@@ -1,3 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Web版: ボタンをタップ/クリックした際、ブラウザ既定のフォーカスの縁取りや
+   タップハイライトが白っぽい影のように重なって見えることがあったため抑制する
+   (実機フィードバック: 「登録するボタンに変な白っぽいシャドーがかぶっている」)。 */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+[role='button']:focus,
+[role='button']:focus-visible {
+  outline: none;
+  box-shadow: none;
+}

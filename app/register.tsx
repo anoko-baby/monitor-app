@@ -4,26 +4,32 @@ import { Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { PrefecturePicker } from '../components/PrefecturePicker';
 import { TextField } from '../components/TextField';
 import { invokeEdgeFunction, supabase } from '../lib/supabase';
 
 export default function Register() {
-  const { code } = useLocalSearchParams<{ code: string }>();
+  const { code, instagramHandle } = useLocalSearchParams<{ code: string; instagramHandle?: string }>();
   const [name, setName] = useState('');
   const [prefecture, setPrefecture] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleRegister() {
-    if (!name.trim() || !prefecture.trim() || !phone.trim()) {
-      setError('氏名・都道府県・電話番号を入力してください');
+    if (!name.trim() || !prefecture.trim() || !phone.trim() || !email.trim()) {
+      setError('氏名・都道府県・電話番号・メールアドレスを入力してください');
       return;
     }
     if (password.length < 8) {
       setError('パスワードは8文字以上で入力してください');
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setError('パスワードが一致しません。確認用のパスワードをご確認ください');
       return;
     }
     setLoading(true);
@@ -58,27 +64,37 @@ export default function Register() {
         今後このメールアドレスとパスワードでログインします。
       </Text>
 
-      <TextField label="氏名" value={name} onChangeText={setName} />
-      <TextField label="都道府県" value={prefecture} onChangeText={setPrefecture} placeholder="広島県" />
+      {!!instagramHandle && (
+        <TextField label="Instagramアカウント名(招待時の登録内容・変更不可)" value={`@${instagramHandle}`} editable={false} />
+      )}
+
+      <TextField label="氏名(必須)" value={name} onChangeText={setName} />
+      <PrefecturePicker label="都道府県(必須)" value={prefecture} onChange={setPrefecture} />
       <TextField
-        label="電話番号"
+        label="電話番号(必須)"
         value={phone}
         onChangeText={setPhone}
         keyboardType="phone-pad"
         placeholder="09012345678"
       />
       <TextField
-        label="メールアドレス"
+        label="メールアドレス(必須)"
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
       />
+      <TextField
+        label="パスワード(8文字以上・必須)"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
       <View className="mb-6">
         <TextField
-          label="パスワード(8文字以上)"
-          value={password}
-          onChangeText={setPassword}
+          label="パスワード(確認用・必須)"
+          value={passwordConfirm}
+          onChangeText={setPasswordConfirm}
           secureTextEntry
         />
       </View>
@@ -88,7 +104,7 @@ export default function Register() {
       <AppButton
         label={loading ? '登録中…' : '登録する'}
         onPress={handleRegister}
-        disabled={!name || !prefecture || !phone || !email || !password}
+        disabled={!name || !prefecture || !phone || !email || !password || !passwordConfirm}
         loading={loading}
       />
     </View>
