@@ -629,6 +629,17 @@ Dropbox連携先の切り替え作業中に試行された提出ファイル(`IM
 - **重要**: 画面側だけでなく、`tasks`/`submissions`/`submission_files`/`submission_children`/`submission_child_variants`へのモニターからのINSERT/UPDATE系RLSポリシーが、いずれも「status <> 'approved'」の場合のみ許可する条件になっていたため、画面を編集可能にしただけではRLS違反で保存に失敗する状態だった。`supabase/migrations/20260826000004_allow_resubmission_after_approval.sql`で、該当ポリシーの条件を「cancelledでなければ許可」に緩和した(承認取り消し等の運用は無いため、approvedを弾いていた制約はcancelledのみに絞って問題ない)
 - `npx tsc --noEmit`通過。**要マイグレーション適用(`npx supabase db push`)**。Edge Functionの変更は無い
 
+## 本登録画面の改善(ボタンの影・必須表示・Instagram確認・パスワード確認欄・都道府県プルダウン)(2026-08-26)
+
+- 実機フィードバック: 「登録するボタンに変な白っぽいシャドーがかぶっている」「各表示項目を必須項目として」「Instagramアカウント名も編集不可の状態で表示だけしたい(間違いないかの確認)」「パスワードの設定も確認用入力欄が欲しい」「都道府県の選択は北海道から順にプルダウンで表示できたらうれしい」
+- **ボタンの白っぽい影**: Web版で、ボタンをタップ/クリックした際にブラウザ既定のフォーカスの縁取り・タップハイライトが白っぽく重なって見えていた。`global.css`に`-webkit-tap-highlight-color: transparent`と`[role='button']`のfocus時outline/box-shadow抑制を追加(全画面のボタン共通の見た目改善)
+- **必須表示**: `app/register.tsx`の各項目ラベルに「(必須)」を追加。あわせて送信前チェックにメールアドレスの未入力チェックが漏れていたのを追加した
+- **Instagramアカウント名の確認表示**: 招待コード入力画面(`app/invite-code.tsx`)で、次へ進む前に新設の`invite-code-lookup` Edge Functionでコードの有効性を確認するように変更(不正なコードをこの時点で弾けるようになった副次効果もあり)。取得したInstagramアカウント名を本登録画面に引き継ぎ、編集不可の表示専用項目として一番上に表示するようにした(誤りがないか本人が確認できるように)
+- **パスワード確認欄**: `app/register.tsx`に「パスワード(確認用)」欄を追加し、一致しない場合はエラーを表示して送信をブロックするようにした
+- **都道府県プルダウン**: 自由入力のテキスト欄から、北海道→沖縄県の順に47都道府県を選択できるプルダウン(`components/PrefecturePicker.tsx`。CalendarPickerと同様、ネイティブモジュールに依存しないModal+リストの自前実装)に変更した
+- 対応範囲は今回「本登録画面」に限定。管理画面側のモニター詳細・モニター自身のプロフィール編集画面にも都道府県のテキスト入力欄が残っているので、同様にプルダウン化したい場合は別途対応する
+- `npx tsc --noEmit`通過。**要Edge Functionの新規デプロイ**(`invite-code-lookup`)。DBマイグレーションの変更は無い
+
 ---
 
 ## 未確定・要確認事項の記録

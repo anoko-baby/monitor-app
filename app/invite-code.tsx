@@ -5,19 +5,38 @@ import { Text, View } from 'react-native';
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { TextField } from '../components/TextField';
+import { invokeEdgeFunction } from '../lib/supabase';
 
 export default function InviteCode() {
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
 
-  function handleNext() {
+  async function handleNext() {
     const trimmed = code.trim().toUpperCase();
     if (!/^[A-Z0-9]{8}$/.test(trimmed)) {
       setError('8桁の英数字で入力してください');
       return;
     }
     setError(null);
-    router.push({ pathname: '/register', params: { code: trimmed } });
+    setChecking(true);
+
+    const { data, errorMessage } = await invokeEdgeFunction<{ instagramHandle: string | null }>(
+      'invite-code-lookup',
+      { body: { code: trimmed } }
+    );
+
+    setChecking(false);
+
+    if (errorMessage) {
+      setError(errorMessage);
+      return;
+    }
+
+    router.push({
+      pathname: '/register',
+      params: { code: trimmed, instagramHandle: data?.instagramHandle ?? '' },
+    });
   }
 
   return (
@@ -42,7 +61,12 @@ export default function InviteCode() {
 
       {error && <ErrorBanner message={error} />}
 
-      <AppButton label="次へ" onPress={handleNext} disabled={code.length !== 8} />
+      <AppButton
+        label={checking ? '確認中…' : '次へ'}
+        onPress={handleNext}
+        disabled={code.length !== 8}
+        loading={checking}
+      />
     </View>
   );
 }
