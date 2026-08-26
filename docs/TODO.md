@@ -619,6 +619,16 @@ Dropbox連携先の切り替え作業中に試行された提出ファイル(`IM
 - 合わせて、案件登録時の提出期限日・開始月・SNS投稿期限日の入力を、手入力(YYYY-MM-DD形式のテキスト欄)からカレンダー選択(既存の`CalendarPicker`コンポーネント。撮影日・子どもの生年月で使っているものと同じ)に統一した(実機フィードバック: 「案件登録時の期限などの設定時のカレンダー表示もお願い」)
 - `npx tsc --noEmit`通過。**要マイグレーション適用(`npx supabase db push`)・要Edge Functionの再デプロイ**(`shopify-product-search`・`shopify-order-lookup`・新規の`shopify-resync-variant-titles`の3つ)。デプロイ後、案件一覧の「バリエーション名を再取得」ボタンを一度押してもらうと、登録済みの商品にもバリエーション名が反映される
 
+## 確認済み(approved)の提出も追加提出を何度でもできるように変更(2026-08-26)
+
+- 実機フィードバック: 「提出済みの案件について、追加提出が何度でもできるようにもしたい」
+- これまでは`app/submission-form.tsx`・`app/sns-submission-form.tsx`とも、タスクが「確認済み(approved)」になった時点で画面全体が編集不可(`readOnly`)になり、それ以上ファイルを追加したり内容を編集したりできなかった
+- 対応: `readOnly`による画面ロックを撤廃し、確認済みの提出でも写真・動画の追加やURL・メモの編集を随時行えるようにした。追加提出すると、タスクのstatusは自動的に「確認待ち(submitted)」に戻り、管理側の再確認対象になる(仕組みは差し戻し後の再提出と同じ)
+- 提出済みボタンのラベルは、確認済みの状態から追加提出する場合のみ「追加で提出する」に変更(それ以外は従来通り「提出する」)
+- 既に一度提出したファイルの削除は引き続きできない(pending・rejectedの時のみ削除可、という既存ルールは変更していない)。今回追加できるのは新しいファイルの「追加」のみ
+- **重要**: 画面側だけでなく、`tasks`/`submissions`/`submission_files`/`submission_children`/`submission_child_variants`へのモニターからのINSERT/UPDATE系RLSポリシーが、いずれも「status <> 'approved'」の場合のみ許可する条件になっていたため、画面を編集可能にしただけではRLS違反で保存に失敗する状態だった。`supabase/migrations/20260826000004_allow_resubmission_after_approval.sql`で、該当ポリシーの条件を「cancelledでなければ許可」に緩和した(承認取り消し等の運用は無いため、approvedを弾いていた制約はcancelledのみに絞って問題ない)
+- `npx tsc --noEmit`通過。**要マイグレーション適用(`npx supabase db push`)**。Edge Functionの変更は無い
+
 ---
 
 ## 未確定・要確認事項の記録

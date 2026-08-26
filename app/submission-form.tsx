@@ -500,7 +500,7 @@ export function SubmissionFormContent({ taskId }: { taskId: string }) {
     setSubmitting(true);
     try {
       const subId = await ensureSubmissionId();
-      const isResubmission = taskStatus === 'rejected';
+      const isResubmission = taskStatus !== 'pending';
       const newVersion = isResubmission ? version + 1 : version;
 
       const { error: subError } = await supabase
@@ -622,10 +622,10 @@ export function SubmissionFormContent({ taskId }: { taskId: string }) {
     );
   }
 
-  const readOnly = taskStatus === 'approved';
   // 一度提出した(確認待ちの)ファイルは削除できないようにする。下書き中(pending)・差し戻され
   // 再提出中(rejected)の時だけ削除可能(supabase/migrations/...restrict_submission_files_delete...
-  // のRLSポリシーと同じ条件に揃える)。
+  // のRLSポリシーと同じ条件に揃える)。確認済み(approved)後も追加提出は何度でもできるようにし、
+  // 追加提出すると再度確認待ち(submitted)に戻る(実機フィードバック)。
   const canDeleteFiles = taskStatus === 'pending' || taskStatus === 'rejected';
 
   return (
@@ -648,13 +648,13 @@ export function SubmissionFormContent({ taskId }: { taskId: string }) {
         </View>
       )}
 
-      {readOnly && (
+      {taskStatus === 'approved' && !submitted && (
         <Text className="font-body text-caption text-status-approved mb-4">
-          確認済みのため編集できません
+          確認済みです。追加で提出することもできます
         </Text>
       )}
 
-      {submitted && !readOnly && (
+      {submitted && (
         <Text className="font-body-medium text-caption text-accent-ink mb-4">提出しました</Text>
       )}
 
@@ -692,54 +692,50 @@ export function SubmissionFormContent({ taskId }: { taskId: string }) {
         </View>
       )}
 
-      {!readOnly && (
-        <>
-          <View className="flex-row mb-4" style={{ gap: 8 }}>
-            <View className="flex-1">
-              <AppButton label="写真を選ぶ" onPress={() => pickFiles('photo')} variant="secondary" />
-            </View>
-            <View className="flex-1">
-              <AppButton label="動画を選ぶ" onPress={() => pickFiles('video')} variant="secondary" />
-            </View>
-          </View>
+      <View className="flex-row mb-4" style={{ gap: 8 }}>
+        <View className="flex-1">
+          <AppButton label="写真を選ぶ" onPress={() => pickFiles('photo')} variant="secondary" />
+        </View>
+        <View className="flex-1">
+          <AppButton label="動画を選ぶ" onPress={() => pickFiles('video')} variant="secondary" />
+        </View>
+      </View>
 
-          {pendingFiles.map((f) => (
-            <View
-              key={f.key}
-              className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2 flex-row items-center justify-between"
-            >
-              <View className="flex-1 mr-2">
-                <Text className="font-body text-caption text-ink" numberOfLines={1}>
-                  {f.originalFilename}
-                </Text>
-                <Text className="font-body text-tiny text-ink-soft">
-                  {f.status === 'pending' && (wifiOnly ? 'Wi-Fi接続を待っています' : '待機中')}
-                  {f.status === 'processing' && '処理中…'}
-                  {f.status === 'uploading' && 'アップロード中…'}
-                  {f.status === 'done' && '完了'}
-                  {f.status === 'error' && (f.errorMessage ?? 'エラー')}
-                </Text>
-              </View>
-              {f.status === 'error' ? (
-                <View className="flex-row items-center" style={{ gap: 12 }}>
-                  <Pressable onPress={() => startProcessing(f)}>
-                    <Text className="font-body text-caption text-accent-ink">再試行</Text>
-                  </Pressable>
-                  <Pressable onPress={() => removeFile(f.key)}>
-                    <Text className="font-body text-caption text-status-overdue">削除</Text>
-                  </Pressable>
-                </View>
-              ) : f.status !== 'done' ? (
-                <ActivityIndicator color="#7E8F86" />
-              ) : (
-                <Pressable onPress={() => removeFile(f.key)}>
-                  <Text className="font-body text-caption text-status-overdue">削除</Text>
-                </Pressable>
-              )}
+      {pendingFiles.map((f) => (
+        <View
+          key={f.key}
+          className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2 flex-row items-center justify-between"
+        >
+          <View className="flex-1 mr-2">
+            <Text className="font-body text-caption text-ink" numberOfLines={1}>
+              {f.originalFilename}
+            </Text>
+            <Text className="font-body text-tiny text-ink-soft">
+              {f.status === 'pending' && (wifiOnly ? 'Wi-Fi接続を待っています' : '待機中')}
+              {f.status === 'processing' && '処理中…'}
+              {f.status === 'uploading' && 'アップロード中…'}
+              {f.status === 'done' && '完了'}
+              {f.status === 'error' && (f.errorMessage ?? 'エラー')}
+            </Text>
+          </View>
+          {f.status === 'error' ? (
+            <View className="flex-row items-center" style={{ gap: 12 }}>
+              <Pressable onPress={() => startProcessing(f)}>
+                <Text className="font-body text-caption text-accent-ink">再試行</Text>
+              </Pressable>
+              <Pressable onPress={() => removeFile(f.key)}>
+                <Text className="font-body text-caption text-status-overdue">削除</Text>
+              </Pressable>
             </View>
-          ))}
-        </>
-      )}
+          ) : f.status !== 'done' ? (
+            <ActivityIndicator color="#7E8F86" />
+          ) : (
+            <Pressable onPress={() => removeFile(f.key)}>
+              <Text className="font-body text-caption text-status-overdue">削除</Text>
+            </Pressable>
+          )}
+        </View>
+      ))}
 
       <Text className="font-body-medium text-body text-ink mb-2 mt-4">提出内容</Text>
 
@@ -749,7 +745,6 @@ export function SubmissionFormContent({ taskId }: { taskId: string }) {
           mode="date"
           value={fieldValues.shot_date || null}
           onChange={(v) => setFieldValue('shot_date', v)}
-          editable={!readOnly}
           maxDate={todayDateString()}
         />
       )}
@@ -766,7 +761,6 @@ export function SubmissionFormContent({ taskId }: { taskId: string }) {
             return (
               <Pressable
                 key={child.id}
-                disabled={readOnly}
                 onPress={() => toggleChild(child.id)}
                 className={`rounded-full border px-4 py-2 ${
                   selected ? 'border-accent bg-accent' : 'border-line bg-surface'
@@ -802,7 +796,6 @@ export function SubmissionFormContent({ taskId }: { taskId: string }) {
                     return (
                       <Pressable
                         key={v.id}
-                        disabled={readOnly}
                         onPress={() => toggleChildVariant(child.id, v.id)}
                         className={`rounded-control border px-3 py-2 ${
                           selected ? 'border-accent bg-accent' : 'border-line bg-bg'
@@ -828,7 +821,6 @@ export function SubmissionFormContent({ taskId }: { taskId: string }) {
                       {f.options.map((opt) => (
                         <Pressable
                           key={opt}
-                          disabled={readOnly}
                           onPress={() => setChildFieldValue(child.id, f.key, opt)}
                           className={`rounded-control border px-3 py-2 ${
                             value === opt ? 'border-accent bg-accent' : 'border-line bg-bg'
@@ -850,7 +842,6 @@ export function SubmissionFormContent({ taskId }: { taskId: string }) {
                   label={`${f.label}${f.unit ? `(${f.unit})` : ''}`}
                   value={value}
                   onChangeText={(text) => setChildFieldValue(child.id, f.key, text)}
-                  editable={!readOnly}
                   keyboardType={f.input_type === 'number' ? 'decimal-pad' : 'default'}
                   multiline={f.key === 'memo'}
                   numberOfLines={f.key === 'memo' ? 3 : undefined}
@@ -863,13 +854,11 @@ export function SubmissionFormContent({ taskId }: { taskId: string }) {
 
       {submitError && <ErrorBanner message={submitError} />}
 
-      {!readOnly && (
-        <AppButton
-          label={submitting ? '送信中…' : '提出する'}
-          onPress={handleSubmit}
-          loading={submitting}
-        />
-      )}
+      <AppButton
+        label={submitting ? '送信中…' : taskStatus === 'approved' ? '追加で提出する' : '提出する'}
+        onPress={handleSubmit}
+        loading={submitting}
+      />
     </ScrollView>
   );
 }
