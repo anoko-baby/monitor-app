@@ -69,6 +69,9 @@ Deno.serve(async (req: Request) => {
   // 検索クエリ構築時に必ず付け直す。
   const normalizedOrderNumber = String(orderNumber).replace(/^#/, '');
 
+  // status指定が無いと、Shopifyの注文検索はデフォルトで「未処理(open)」の注文しか対象にせず、
+  // 発送済み・クローズ済みの古い注文がヒットしなかった(実機で確認: 今日の未発送注文は見つかるが、
+  // 発送済みの古い注文は見つからなかった)。status:anyを付けて全ステータスを対象にする。
   const response = await fetch(
     `https://${storeDomain}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`,
     {
@@ -77,7 +80,10 @@ Deno.serve(async (req: Request) => {
         'Content-Type': 'application/json',
         'X-Shopify-Access-Token': accessToken,
       },
-      body: JSON.stringify({ query: gqlQuery, variables: { query: `name:#${normalizedOrderNumber}` } }),
+      body: JSON.stringify({
+        query: gqlQuery,
+        variables: { query: `name:#${normalizedOrderNumber} status:any` },
+      }),
     }
   );
 
