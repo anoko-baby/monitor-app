@@ -1,6 +1,6 @@
 // 案件登録時にDropboxへ規定のフォルダ構造を作成する(仕様書 v1.8 6.1)。
-// DROPBOX_ROOT_NAMESPACE_ID設定時(「モニターデータ」名前空間直下): /{ブランド名}/{商品名}_{SKU}/{案件番号}_{モニター名}/第{n}回_{提出期限YYYYMMDD}/
-// 未設定時(従来のApp folder/ホーム名前空間運用): /anoko_monitor/{ブランド名}/{商品名}_{SKU}/{案件番号}_{モニター名}/第{n}回_{提出期限YYYYMMDD}/
+// DROPBOX_ROOT_NAMESPACE_ID設定時(「モニターデータ」名前空間直下): /{ブランド名}/{商品名}/{案件番号}_{Instagramアカウント名}/第{n}回_{提出期限YYYYMMDD}/
+// 未設定時(従来のApp folder/ホーム名前空間運用): /anoko_monitor/{ブランド名}/{商品名}/{案件番号}_{Instagramアカウント名}/第{n}回_{提出期限YYYYMMDD}/
 // DB読み書きは呼び出し元(admin/staff)のJWTをそのまま転送し、RLSに従う(service roleは使わない)。
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import {
@@ -121,12 +121,14 @@ Deno.serve(async (req: Request) => {
 
   const dueDateByCycleId = new Map((mediaTasks ?? []).map((t) => [t.cycle_id, t.due_date as string]));
 
+  // 商品フォルダはSKU単位ではなく商品単位(同じ商品の別バリアントは同じフォルダに集約)。
+  // 案件フォルダは「案件番号_モニター名」ではなく「案件番号_Instagramアカウント名」にする
+  // (Instagramアカウント名の方がモニターを特定しやすいため。未設定の場合は氏名等にフォールバック)。
   const brandSegment = sanitizeDropboxPathSegment(product?.brand || '未分類ブランド');
-  const productSegment = sanitizeDropboxPathSegment(
-    `${product?.title || '商品名未設定'}_${variant?.sku || 'SKU未設定'}`
-  );
+  const productSegment = sanitizeDropboxPathSegment(product?.title || '商品名未設定');
+  const monitorFolderName = monitor?.instagram_handle || monitorDisplayName(monitor);
   const monitorSegment = sanitizeDropboxPathSegment(
-    `${formatCampaignNo(campaign.campaign_no)}_${monitorDisplayName(monitor)}`
+    `${formatCampaignNo(campaign.campaign_no)}_${monitorFolderName}`
   );
 
   // DROPBOX_ROOT_NAMESPACE_ID未設定時(従来のApp folder/ホーム名前空間運用)との後方互換のため、

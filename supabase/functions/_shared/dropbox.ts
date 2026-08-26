@@ -36,8 +36,14 @@ export async function getDropboxAccessToken(): Promise<TokenResult> {
 }
 
 // パス使用不可文字(/ \ : * ? " < > |)を「-」に置換する(仕様書 v1.8 6.1)。
+// 末尾の「.」やスペースはWindowsのファイル/フォルダ名として不正(Dropboxのデスクトップアプリが
+// ローカル同期時に末尾を「_」へ勝手に置き換えてしまい紛らわしい表示になる)ため、あわせて除去する。
+// lib/campaigns.ts と同じロジック(要同期)。
 export function sanitizeDropboxPathSegment(segment: string): string {
-  return segment.replace(/[/\\:*?"<>|]/g, '-').trim();
+  return segment
+    .replace(/[/\\:*?"<>|]/g, '-')
+    .trim()
+    .replace(/[.\s]+$/, '');
 }
 
 // Dropboxアカウントが会社(チーム)アカウントの場合、Full Dropbox権限でも既定では自分の

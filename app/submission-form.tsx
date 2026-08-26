@@ -626,6 +626,10 @@ export function SubmissionFormContent({ taskId }: { taskId: string }) {
   }
 
   const readOnly = taskStatus === 'approved';
+  // 一度提出した(確認待ちの)ファイルは削除できないようにする。下書き中(pending)・差し戻され
+  // 再提出中(rejected)の時だけ削除可能(supabase/migrations/...restrict_submission_files_delete...
+  // のRLSポリシーと同じ条件に揃える)。
+  const canDeleteFiles = taskStatus === 'pending' || taskStatus === 'rejected';
 
   return (
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
@@ -666,7 +670,7 @@ export function SubmissionFormContent({ taskId }: { taskId: string }) {
                 {f.signedThumbUrl && (
                   <Image source={{ uri: f.signedThumbUrl }} style={{ width: 96, height: 96 }} />
                 )}
-                {!readOnly && (
+                {canDeleteFiles && (
                   <Pressable
                     onPress={() => removeExistingFile(f.id)}
                     hitSlop={8}

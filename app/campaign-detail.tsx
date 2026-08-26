@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
@@ -5,6 +6,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { HeroScreen } from '../components/HeroScreen';
+import { StatusPill } from '../components/StatusPill';
 import { goBackOrReplace } from '../lib/navigation';
 import { supabase } from '../lib/supabase';
 
@@ -29,6 +31,17 @@ const TASK_STATUS_LABEL: Record<string, string> = {
   rejected: '差し戻し',
   cancelled: 'キャンセル',
 };
+
+type PillTone = 'neutral' | 'accent' | 'overdue' | 'rejected';
+
+// データ提出とSNS投稿の区別がぱっと見でわかるよう、タスク種別ごとにアイコン・見出し・ボタン風の
+// 見た目を分ける(実機フィードバック: 「回次一覧でデータ提出と投稿の区別がわかりづらい」)。
+function taskStatusTone(status: string, dueDate: string): PillTone {
+  if (status === 'rejected') return 'rejected';
+  if (status === 'approved' || status === 'submitted') return 'accent';
+  const today = new Date().toISOString().slice(0, 10);
+  return dueDate < today ? 'overdue' : 'neutral';
+}
 
 function formatDueDate(dateStr: string): string {
   const [, month, day] = dateStr.split('-');
@@ -189,33 +202,53 @@ export function CampaignDetailContent({
           >
             <Text className="font-body-medium text-body text-ink mb-2">{cycle.label}</Text>
 
-            {mediaTask && mediaTask.status !== 'cancelled' && (
-              <Pressable
-                onPress={() => onOpenTask(mediaTask.id, 'media')}
-                className="flex-row items-center justify-between mb-2"
-              >
-                <Text className="font-body text-body text-ink">
-                  データ提出・{formatDueDate(mediaTask.due_date)}まで
-                </Text>
-                <Text className="font-body text-caption text-accent-ink">
-                  {TASK_STATUS_LABEL[mediaTask.status]} ›
-                </Text>
-              </Pressable>
-            )}
+            <View style={{ gap: 8 }}>
+              {mediaTask && mediaTask.status !== 'cancelled' && (
+                <Pressable
+                  onPress={() => onOpenTask(mediaTask.id, 'media')}
+                  className="flex-row items-center justify-between rounded-control border-hairline border-line bg-bg px-3 py-3"
+                >
+                  <View className="flex-row items-center flex-1" style={{ gap: 10 }}>
+                    <View className="bg-accent/15 rounded-full items-center justify-center" style={{ width: 32, height: 32 }}>
+                      <Ionicons name="image-outline" size={16} color="#4E5B54" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="font-body-medium text-body text-ink">データ提出</Text>
+                      <Text className="font-body text-tiny text-ink-soft">
+                        {formatDueDate(mediaTask.due_date)}まで
+                      </Text>
+                    </View>
+                  </View>
+                  <StatusPill
+                    label={TASK_STATUS_LABEL[mediaTask.status]}
+                    tone={taskStatusTone(mediaTask.status, mediaTask.due_date)}
+                  />
+                </Pressable>
+              )}
 
-            {snsTask && snsTask.status !== 'cancelled' && (
-              <Pressable
-                onPress={() => onOpenTask(snsTask.id, 'sns')}
-                className="flex-row items-center justify-between"
-              >
-                <Text className="font-body text-body text-ink">
-                  SNS投稿・{formatDueDate(snsTask.due_date)}まで
-                </Text>
-                <Text className="font-body text-caption text-accent-ink">
-                  {TASK_STATUS_LABEL[snsTask.status]} ›
-                </Text>
-              </Pressable>
-            )}
+              {snsTask && snsTask.status !== 'cancelled' && (
+                <Pressable
+                  onPress={() => onOpenTask(snsTask.id, 'sns')}
+                  className="flex-row items-center justify-between rounded-control border-hairline border-line bg-bg px-3 py-3"
+                >
+                  <View className="flex-row items-center flex-1" style={{ gap: 10 }}>
+                    <View className="bg-accent/15 rounded-full items-center justify-center" style={{ width: 32, height: 32 }}>
+                      <Ionicons name="logo-instagram" size={16} color="#4E5B54" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="font-body-medium text-body text-ink">Instagram投稿</Text>
+                      <Text className="font-body text-tiny text-ink-soft">
+                        {formatDueDate(snsTask.due_date)}まで
+                      </Text>
+                    </View>
+                  </View>
+                  <StatusPill
+                    label={TASK_STATUS_LABEL[snsTask.status]}
+                    tone={taskStatusTone(snsTask.status, snsTask.due_date)}
+                  />
+                </Pressable>
+              )}
+            </View>
           </View>
         );
       })}
