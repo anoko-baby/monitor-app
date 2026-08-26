@@ -17,7 +17,7 @@ import {
   suggestCampaignTitle,
 } from '../lib/campaigns';
 import { goBackOrReplace } from '../lib/navigation';
-import { supabase } from '../lib/supabase';
+import { invokeEdgeFunction, supabase } from '../lib/supabase';
 
 type ProductSelection = {
   key: string;
@@ -271,13 +271,13 @@ export function AdminCampaignFormContent({
     if (!orderNo) return;
     setOrderLoading(true);
     setOrderError(null);
-    const { data, error } = await supabase.functions.invoke('shopify-order-lookup', {
+    const { data, errorMessage } = await invokeEdgeFunction<any>('shopify-order-lookup', {
       body: { orderNumber: orderNo },
     });
     setOrderLoading(false);
 
-    if (error || data?.error) {
-      setOrderError(data?.error ?? '注文の取得に失敗しました');
+    if (errorMessage || !data) {
+      setOrderError(errorMessage ?? '注文の取得に失敗しました');
       return;
     }
 
@@ -322,16 +322,12 @@ export function AdminCampaignFormContent({
   async function handleProductSearch() {
     if (!productQuery) return;
     setProductSearchLoading(true);
-    const { data, error } = await supabase.functions.invoke('shopify-product-search', {
+    const { data, errorMessage } = await invokeEdgeFunction<any>('shopify-product-search', {
       body: { query: productQuery },
     });
     setProductSearchLoading(false);
     setProductSearched(true);
-    if (!error && !data?.error) {
-      setProductSearchResults(data.products ?? []);
-    } else {
-      setProductSearchResults([]);
-    }
+    setProductSearchResults(errorMessage ? [] : data?.products ?? []);
   }
 
   function toggleVariantSelection(product: SearchProduct, variant: SearchVariant) {
@@ -625,14 +621,14 @@ export function AdminCampaignFormContent({
         }
       }
 
-      const { error: dropboxError } = await supabase.functions.invoke(
+      const { errorMessage: dropboxErrorMessage } = await invokeEdgeFunction(
         'dropbox-create-campaign-folders',
         { body: { campaignId } }
       );
-      if (dropboxError) {
+      if (dropboxErrorMessage) {
         setSubmitting(false);
         setSubmitError(
-          '案件は作成されましたが、Dropboxフォルダの作成に失敗しました。案件一覧から確認してください。'
+          `案件は作成されましたが、Dropboxフォルダの作成に失敗しました: ${dropboxErrorMessage}`
         );
         finishAndReturn();
         return;

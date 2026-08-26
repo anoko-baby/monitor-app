@@ -5,7 +5,7 @@ import { Text, View } from 'react-native';
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { TextField } from '../components/TextField';
-import { supabase } from '../lib/supabase';
+import { invokeEdgeFunction, supabase } from '../lib/supabase';
 
 export default function Register() {
   const { code } = useLocalSearchParams<{ code: string }>();
@@ -29,13 +29,13 @@ export default function Register() {
     setLoading(true);
     setError(null);
 
-    const { data, error: fnError } = await supabase.functions.invoke('invite-register', {
+    const { errorMessage } = await invokeEdgeFunction('invite-register', {
       body: { code, email, password, name: name.trim(), prefecture: prefecture.trim(), phone: phone.trim() },
     });
 
-    if (fnError || data?.error) {
+    if (errorMessage) {
       setLoading(false);
-      setError(data?.error ?? '登録に失敗しました。招待コードをご確認ください。');
+      setError(errorMessage);
       return;
     }
 

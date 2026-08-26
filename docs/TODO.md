@@ -531,6 +531,17 @@ Dropbox連携先の切り替え作業中に試行された提出ファイル(`IM
 
 ---
 
+## Edge Functionのエラーメッセージが本来の原因を隠してしまう不具合を修正(2026-08-26)
+
+「案件登録時に注文を取り込もうとしたら『注文の取得に失敗しました』となって取り込みできなかった」との報告を受けて調査した結果、Shopify連携固有の問題ではなく、**Edge Functionを呼び出している全画面に共通する構造的な不具合**だと判明した。
+
+- 原因: `supabase.functions.invoke()`は、呼び出したEdge Functionが2xx以外のステータスを返すと`data`を`null`にしてしまう仕様がある。Edge Function側は`{error: '...'}`というJSONで具体的な理由を返しているのに、そのJSON本体は`error.context`という別のResponseオブジェクトの中に入っていて、明示的に`.json()`で読み直さないと取得できない。既存コードは各画面で`data?.error ?? '〜に失敗しました'`という書き方をしていたため、2xx以外が返るケース(バリデーションエラー・外部API側のエラー・secrets未設定等、実質ほとんどのエラーケース)で常に本来のエラーメッセージが読めず、汎用メッセージにフォールバックしていた。これが「注文の取得に失敗しました」しか出ず原因が分からなかった直接の原因
+- 修正: `lib/supabase.ts`に`invokeEdgeFunction()`という共通ヘルパーを新設。`error.context`から本来のJSONエラーメッセージを正しく取り出すようにした。`supabase.functions.invoke()`を直接呼んでエラーをユーザーに表示していた全箇所(`admin-campaign-form.tsx`の注文取込・商品検索・Dropboxフォルダ作成、`admin-watched-coupons.tsx`、`admin-product-search.tsx`、`register.tsx`、`lib/dropbox.ts`のトークン取得)をこのヘルパー経由に置き換えた
+- これにより、今後Edge Function側のエラーで問題が起きた際は、画面に表示されるメッセージが実際の原因(Shopify APIのエラー内容・secrets未設定・404等)を正しく示すようになる。注文取込の不具合自体の直接原因はまだ特定できていない(今回の修正後、実際にどんなメッセージが出るか確認してから次を判断する)
+- `npx tsc --noEmit`・`npx expo export -p web`とも通過を確認済み
+
+---
+
 ## 未確定・要確認事項の記録
 
 - Dropbox Scoped App / Supabaseプロジェクトは未作成(2026-07-09時点)。M1着手前に準備が必要
