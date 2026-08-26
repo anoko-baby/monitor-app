@@ -6,7 +6,7 @@ import { ErrorBanner } from '../components/ErrorBanner';
 import { HeroScreen } from '../components/HeroScreen';
 import { TextField } from '../components/TextField';
 import { goBackOrReplace } from '../lib/navigation';
-import { supabase } from '../lib/supabase';
+import { invokeEdgeFunction, supabase } from '../lib/supabase';
 
 type WatchedCoupon = {
   id: string;
@@ -41,13 +41,13 @@ export function AdminWatchedCouponsContent() {
     setChecking(true);
     setError(null);
 
-    const { data, error: fnError } = await supabase.functions.invoke('shopify-check-discount', {
+    const { data, errorMessage } = await invokeEdgeFunction<any>('shopify-check-discount', {
       body: { code },
     });
 
-    if (fnError || data?.error) {
+    if (errorMessage || !data) {
       setChecking(false);
-      setError(data?.error ?? 'クーポンの確認に失敗しました');
+      setError(errorMessage ?? 'クーポンの確認に失敗しました');
       return;
     }
 

@@ -6,7 +6,7 @@ import { ErrorBanner } from '../components/ErrorBanner';
 import { HeroScreen } from '../components/HeroScreen';
 import { TextField } from '../components/TextField';
 import { goBackOrReplace } from '../lib/navigation';
-import { supabase } from '../lib/supabase';
+import { invokeEdgeFunction } from '../lib/supabase';
 
 type Variant = {
   shopifyVariantId: string;
@@ -38,14 +38,14 @@ export function AdminProductSearchContent() {
     setError(null);
     setSearched(true);
 
-    const { data, error: fnError } = await supabase.functions.invoke('shopify-product-search', {
+    const { data, errorMessage } = await invokeEdgeFunction<any>('shopify-product-search', {
       body: { query },
     });
 
     setLoading(false);
 
-    if (fnError || data?.error) {
-      setError(data?.error ?? '商品検索に失敗しました');
+    if (errorMessage || !data) {
+      setError(errorMessage ?? '商品検索に失敗しました');
       setProducts([]);
       return;
     }

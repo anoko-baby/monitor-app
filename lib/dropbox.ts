@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 
-import { supabase } from './supabase';
+import { invokeEdgeFunction } from './supabase';
 
 // Dropbox upload_session はこの単位でチャンク分割する(仕様書 v1.8 6.2)
 const CHUNK_SIZE = 8 * 1024 * 1024;
@@ -61,12 +61,9 @@ function encodeDropboxApiArg(apiArg: unknown): string {
 type DropboxAuth = { accessToken: string; rootNamespaceId: string | null };
 
 async function getDropboxAccessToken(): Promise<DropboxAuth> {
-  const { data, error } = await supabase.functions.invoke('dropbox-token');
-  if (error) {
-    throw new Error(`Dropboxトークンの取得に失敗しました: ${error.message}`);
-  }
-  if (!data?.accessToken) {
-    throw new Error(`Dropboxトークンの取得に失敗しました: ${JSON.stringify(data)}`);
+  const { data, errorMessage } = await invokeEdgeFunction<any>('dropbox-token');
+  if (errorMessage || !data?.accessToken) {
+    throw new Error(`Dropboxトークンの取得に失敗しました: ${errorMessage ?? JSON.stringify(data)}`);
   }
   return { accessToken: data.accessToken as string, rootNamespaceId: data.rootNamespaceId ?? null };
 }
