@@ -90,13 +90,26 @@ Deno.serve(async (req: Request) => {
   }
 
   const json = await response.json();
+
+  // GraphQL自体は200 OKで返るが、権限不足(read_ordersスコープ無し等)や検索構文の問題は
+  // レスポンスボディのerrorsに入る。「注文が見つかりませんでした」という誤解を招く404を
+  // 返す前に、まずこちらを確認して本当の理由を返す。
+  if (json.errors?.length) {
+    return new Response(
+      JSON.stringify({ error: `Shopify APIエラー: ${json.errors.map((e: any) => e.message).join(' / ')}` }),
+      { status: 502, headers: corsHeaders }
+    );
+  }
+
   const order = json.data?.orders?.edges?.[0]?.node;
 
   if (!order) {
-    return new Response(JSON.stringify({ error: `注文が見つかりませんでした(注文番号: #${normalizedOrderNumber})` }), {
-      status: 404,
-      headers: corsHeaders,
-    });
+    return new Response(
+      JSON.stringify({
+        error: `注文が見つかりませんでした(検索語: name:#${normalizedOrderNumber})。Shopify管理画面でこの注文の「注文番号」の表記(先頭の#や接頭辞など)をご確認ください`,
+      }),
+      { status: 404, headers: corsHeaders }
+    );
   }
 
   // 注文の顧客IDから、既に紐付け済みのモニターを検索する(仕様書 v1.8 3.3.1: 自動紐付け)。
