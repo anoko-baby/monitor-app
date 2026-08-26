@@ -7,6 +7,118 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const ORDER_FIELDS = `
+  id
+  name
+  createdAt
+  customer { id firstName lastName email }
+  lineItems(first: 50) {
+    edges {
+      node {
+        sku
+        quantity
+        variant {
+          id
+          selectedOptions { name value }
+          product { title vendor featuredImage { url } }
+        }
+      }
+    }
+  }
+`;
+
+type ShopifyOrderNode = {
+  id: string;
+  name: string;
+  createdAt: string;
+  customer: { id: string; firstName: string | null; lastName: string | null; email: string | null } | null;
+  lineItems: { edges: { node: any }[] };
+};
+
+async function callShopifyGraphQL(
+  storeDomain: string,
+  accessToken: string,
+  query: string,
+  variables: Record<string, unknown>
+): Promise<{ ok: true; json: any } | { ok: false; response: Response }> {
+  const response = await fetch(`https://${storeDomain}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Shopify-Access-Token': accessToken,
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+  if (!response.ok) return { ok: false, response };
+  return { ok: true, json: await response.json() };
+}
+
+// 検索インデックス(query:引数)経由の高速パス。ただし実機検証の結果、アーカイブ済みの古い注文は
+// status:open/closed/cancelledをORで並べても検索インデックスから見つからないケースがあることが
+// 判明した(Shopifyの検索インデックス自体の既知の制約とみられる)。
+async function searchOrderByQuery(
+  storeDomain: string,
+  accessToken: string,
+  normalizedOrderNumber: string
+): Promise<{ order: ShopifyOrderNode | null; errors?: any[] }> {
+  const gqlQuery = `
+    query FindOrder($query: String!) {
+      orders(first: 1, query: $query) {
+        edges { node { ${ORDER_FIELDS} } }
+      }
+    }
+  `;
+  const result = await callShopifyGraphQL(storeDomain, accessToken, gqlQuery, {
+    query: `name:#${normalizedOrderNumber} (status:open OR status:closed OR status:cancelled)`,
+  });
+  if (!result.ok) return { order: null };
+  if (result.json.errors?.length) return { order: null, errors: result.json.errors };
+  return { order: result.json.data?.orders?.edges?.[0]?.node ?? null };
+}
+
+// 検索インデックスで見つからない場合のフォールバック。query:引数を使わない素の一覧取得
+// (検索インデックスを経由しないため、アーカイブ済みの古い注文も含まれる)を新しい順にページ送り
+// しながら、注文名が完全一致するものを探す。最大20ページ(5000件)まで。ページ送り中はid/nameのみ
+// の軽量クエリにして、一致した注文の詳細(lineItems等)は見つかった後に1回だけ別途取得する。
+async function findOrderByPagination(
+  storeDomain: string,
+  accessToken: string,
+  targetName: string
+): Promise<ShopifyOrderNode | null> {
+  const listQuery = `
+    query ListOrders($cursor: String) {
+      orders(first: 250, after: $cursor, sortKey: ID, reverse: true) {
+        edges { cursor node { id name } }
+        pageInfo { hasNextPage }
+      }
+    }
+  `;
+  let cursor: string | null = null;
+  let matchedId: string | null = null;
+  for (let page = 0; page < 20 && !matchedId; page++) {
+    const result = await callShopifyGraphQL(storeDomain, accessToken, listQuery, { cursor });
+    if (!result.ok || result.json.errors?.length) return null;
+    const edges = result.json.data?.orders?.edges ?? [];
+    const match = edges.find((e: any) => e.node.name === targetName);
+    if (match) {
+      matchedId = match.node.id;
+      break;
+    }
+    if (!result.json.data?.orders?.pageInfo?.hasNextPage || edges.length === 0) return null;
+    cursor = edges[edges.length - 1].cursor;
+  }
+  if (!matchedId) return null;
+
+  const detailQuery = `
+    query GetOrder($id: ID!) {
+      order(id: $id) { ${ORDER_FIELDS} }
+    }
+  `;
+  const detailResult = await callShopifyGraphQL(storeDomain, accessToken, detailQuery, { id: matchedId });
+  if (!detailResult.ok || detailResult.json.errors?.length) return null;
+  return detailResult.json.data?.order ?? null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -35,89 +147,26 @@ Deno.serve(async (req: Request) => {
   }
   const { token: accessToken, storeDomain } = tokenResult;
 
-  const gqlQuery = `
-    query FindOrder($query: String!) {
-      orders(first: 1, query: $query) {
-        edges {
-          node {
-            id
-            name
-            createdAt
-            customer { id firstName lastName email }
-            lineItems(first: 50) {
-              edges {
-                node {
-                  sku
-                  quantity
-                  variant {
-                    id
-                    selectedOptions { name value }
-                    product { title vendor featuredImage { url } }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  `;
-
   // Shopifyの注文検索クエリ(name:)は、注文名に含まれる「#」を検索語にも含めないと
   // 一致しない(name:1001ではヒットせず、name:#1001でないとヒットしない仕様)。
-  // 入力欄には「#」ありなし両方で入力される可能性があるため、一旦取り除いてから
-  // 検索クエリ構築時に必ず付け直す。
+  // 入力欄には「#」ありなし両方で入力される可能性があるため、一旦取り除いてから使う。
   const normalizedOrderNumber = String(orderNumber).replace(/^#/, '');
+  const targetName = `#${normalizedOrderNumber}`;
 
-  // status指定が無いと、Shopifyの注文検索はデフォルトで「未処理(open)」の注文しか対象にせず、
-  // 発送済み・アーカイブ済みの古い注文がヒットしなかった(実機で確認: 今日の未発送注文は見つかるが、
-  // アーカイブ済みの古い注文は見つからなかった)。REST APIの`status=any`と違い、この検索構文の
-  // status項目は`any`を受け付けない(実機のデバッグ出力で確認済み: "Input `any` is not an
-  // accepted value.")。有効な値(open/closed/cancelled)をORで並べて全ステータスを対象にする。
-  const response = await fetch(
-    `https://${storeDomain}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Shopify-Access-Token': accessToken,
-      },
-      body: JSON.stringify({
-        query: gqlQuery,
-        variables: {
-          query: `name:#${normalizedOrderNumber} (status:open OR status:closed OR status:cancelled)`,
-        },
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const detail = await response.text();
-    return new Response(JSON.stringify({ error: 'Shopify APIエラー', detail }), {
-      status: 502,
-      headers: corsHeaders,
-    });
-  }
-
-  const json = await response.json();
-
-  // GraphQL自体は200 OKで返るが、権限不足(read_ordersスコープ無し等)や検索構文の問題は
-  // レスポンスボディのerrorsに入る。「注文が見つかりませんでした」という誤解を招く404を
-  // 返す前に、まずこちらを確認して本当の理由を返す。
-  if (json.errors?.length) {
+  const searchResult = await searchOrderByQuery(storeDomain, accessToken, normalizedOrderNumber);
+  if (searchResult.errors?.length) {
     return new Response(
-      JSON.stringify({ error: `Shopify APIエラー: ${json.errors.map((e: any) => e.message).join(' / ')}` }),
+      JSON.stringify({ error: `Shopify APIエラー: ${searchResult.errors.map((e: any) => e.message).join(' / ')}` }),
       { status: 502, headers: corsHeaders }
     );
   }
 
-  const order = json.data?.orders?.edges?.[0]?.node;
+  const order = searchResult.order ?? (await findOrderByPagination(storeDomain, accessToken, targetName));
 
   if (!order) {
-    // 原因調査用: Shopifyから実際に返ってきた内容をそのまま含める(不具合の切り分け後に削除予定)。
     return new Response(
       JSON.stringify({
-        error: `注文が見つかりませんでした(検索語: name:#${normalizedOrderNumber} status:any)。デバッグ情報: ${JSON.stringify(json)}`,
+        error: `注文が見つかりませんでした(注文番号: ${targetName})。Shopify管理画面でこの注文の「注文番号」の表記をご確認ください`,
       }),
       { status: 404, headers: corsHeaders }
     );
