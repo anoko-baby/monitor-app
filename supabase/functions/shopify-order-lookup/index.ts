@@ -110,9 +110,10 @@ Deno.serve(async (req: Request) => {
   const order = json.data?.orders?.edges?.[0]?.node;
 
   if (!order) {
+    // 原因調査用: Shopifyから実際に返ってきた内容をそのまま含める(不具合の切り分け後に削除予定)。
     return new Response(
       JSON.stringify({
-        error: `注文が見つかりませんでした(検索語: name:#${normalizedOrderNumber})。Shopify管理画面でこの注文の「注文番号」の表記(先頭の#や接頭辞など)をご確認ください`,
+        error: `注文が見つかりませんでした(検索語: name:#${normalizedOrderNumber} status:any)。デバッグ情報: ${JSON.stringify(json)}`,
       }),
       { status: 404, headers: corsHeaders }
     );
