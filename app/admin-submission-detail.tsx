@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Linking, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
+import { CalendarPicker } from '../components/CalendarPicker';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { HeroScreen } from '../components/HeroScreen';
 import { TextField } from '../components/TextField';
@@ -537,12 +538,7 @@ export function AdminSubmissionDetailContent({ taskId }: { taskId: string }) {
               multiline
               numberOfLines={3}
             />
-            <TextField
-              label="新しい提出期限(必須・YYYY-MM-DD)"
-              value={rejectDueDate}
-              onChangeText={setRejectDueDate}
-              placeholder="2026-08-20"
-            />
+            <CalendarPicker label="新しい提出期限(必須)" value={rejectDueDate || null} onChange={setRejectDueDate} mode="date" />
             {actionError && <ErrorBanner message={actionError} />}
             <View style={{ gap: 8 }}>
               <AppButton label={rejecting ? '送信中…' : '差し戻す'} onPress={handleReject} loading={rejecting} />

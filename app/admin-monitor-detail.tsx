@@ -6,6 +6,7 @@ import { AchievementSection } from '../components/AchievementSection';
 import { AppButton } from '../components/AppButton';
 import { ChildrenManager } from '../components/ChildrenManager';
 import { HeroScreen } from '../components/HeroScreen';
+import { PrefecturePicker } from '../components/PrefecturePicker';
 import { TextField } from '../components/TextField';
 import { profileDisplayName } from '../lib/campaigns';
 import { goBackOrReplace } from '../lib/navigation';
@@ -94,10 +95,10 @@ export function AdminMonitorDetailContent({ id }: { id: string }) {
         value={profile.nickname ?? ''}
         onChangeText={(text) => setProfile({ ...profile, nickname: text })}
       />
-      <TextField
+      <PrefecturePicker
         label="都道府県"
         value={profile.prefecture ?? ''}
-        onChangeText={(text) => setProfile({ ...profile, prefecture: text })}
+        onChange={(text) => setProfile({ ...profile, prefecture: text })}
       />
       <TextField
         label="電話番号"
