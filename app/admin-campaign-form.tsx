@@ -61,11 +61,13 @@ type SearchProduct = {
   variants: SearchVariant[];
 };
 
+type EditCampaignProduct = { label: string; imageUrl: string | null };
+
 type EditCampaign = {
   id: string;
   campaignNo: number;
   monitorName: string | null;
-  productSummary: string;
+  products: EditCampaignProduct[];
   recurrenceSummary: string;
   dropboxBasePath: string | null;
 };
@@ -682,25 +684,27 @@ export function AdminCampaignFormContent({
       .select('variant_id')
       .eq('campaign_id', id as string);
 
-    let productSummary = '(商品情報なし)';
+    let products: EditCampaignProduct[] = [];
     if (variantLinks && variantLinks.length > 0) {
       const { data: variantsData } = await supabase
         .from('variants')
-        .select('title, sku, size, color, product_id')
+        .select('title, sku, size, color, image_url, product_id')
         .in('id', variantLinks.map((v) => v.variant_id));
       const productIds = Array.from(new Set((variantsData ?? []).map((v) => v.product_id)));
       const { data: productsData } = await supabase
         .from('products')
-        .select('id, title')
+        .select('id, title, image_url')
         .in('id', productIds);
       const productById = new Map((productsData ?? []).map((p) => [p.id, p]));
-      productSummary = (variantsData ?? [])
-        .map((v) => {
-          const label = variantLabel(v);
-          const productTitle = productById.get(v.product_id)?.title ?? '商品名未設定';
-          return label === '(バリエーション)' ? productTitle : `${productTitle} (${label})`;
-        })
-        .join(' / ');
+      products = (variantsData ?? []).map((v) => {
+        const label = variantLabel(v);
+        const product = productById.get(v.product_id);
+        const productTitle = product?.title ?? '商品名未設定';
+        return {
+          label: label === '(バリエーション)' ? productTitle : `${productTitle} (${label})`,
+          imageUrl: v.image_url ?? product?.image_url ?? null,
+        };
+      });
     }
 
     const recurrenceSummary =
@@ -715,7 +719,7 @@ export function AdminCampaignFormContent({
         name: (campaign as any).monitor?.name ?? null,
         instagramHandle: (campaign as any).monitor?.instagram_handle ?? null,
       }),
-      productSummary,
+      products,
       recurrenceSummary,
       dropboxBasePath: campaign.dropbox_base_path,
     });
@@ -784,7 +788,27 @@ export function AdminCampaignFormContent({
         <Text className="font-body text-caption text-ink-soft mb-4">
           {formatCampaignNo(editCampaign.campaignNo)} ・ {editCampaign.monitorName ?? '(モニター不明)'}
         </Text>
-        <Text className="font-body text-caption text-ink-soft mb-1">{editCampaign.productSummary}</Text>
+        {editCampaign.products.length === 0 ? (
+          <Text className="font-body text-caption text-ink-soft mb-4">(商品情報なし)</Text>
+        ) : (
+          <View className="mb-4">
+            {editCampaign.products.map((p, index) => (
+              <View key={index} className="flex-row items-center mb-2" style={{ gap: 10 }}>
+                {p.imageUrl ? (
+                  <Image source={{ uri: p.imageUrl }} style={{ width: 40, height: 40, borderRadius: 8 }} />
+                ) : (
+                  <View
+                    style={{ width: 40, height: 40, borderRadius: 8 }}
+                    className="bg-line items-center justify-center"
+                  >
+                    <Text className="font-body text-tiny text-ink-soft">-</Text>
+                  </View>
+                )}
+                <Text className="font-body text-caption text-ink-soft flex-1">{p.label}</Text>
+              </View>
+            ))}
+          </View>
+        )}
         <Text className="font-body text-caption text-ink-soft mb-6">{editCampaign.recurrenceSummary}</Text>
 
         <TextField label="案件名" value={title} onChangeText={setTitle} />
