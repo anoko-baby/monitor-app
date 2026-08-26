@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { AppButton } from '../components/AppButton';
 import { ErrorBanner } from '../components/ErrorBanner';
@@ -10,7 +10,14 @@ import { StatusPill } from '../components/StatusPill';
 import { goBackOrReplace } from '../lib/navigation';
 import { supabase } from '../lib/supabase';
 
-type ProductInfo = { title: string; brand: string | null; sku: string | null; size: string | null; color: string | null };
+type ProductInfo = {
+  title: string;
+  brand: string | null;
+  imageUrl: string | null;
+  sku: string | null;
+  size: string | null;
+  color: string | null;
+};
 
 type TaskRow = { id: string; type: 'media' | 'sns'; due_date: string; status: string };
 type CycleRow = { id: string; cycle_no: number; label: string; tasks: TaskRow[] };
@@ -89,17 +96,18 @@ export function CampaignDetailContent({
     if (variantLinks && variantLinks.length > 0) {
       const { data: variantsData } = await supabase
         .from('variants')
-        .select('sku, size, color, product_id')
+        .select('sku, size, color, image_url, product_id')
         .in('id', variantLinks.map((v) => v.variant_id));
       const productIds = Array.from(new Set((variantsData ?? []).map((v) => v.product_id)));
       const { data: productsData } = await supabase
         .from('products')
-        .select('id, title, brand')
+        .select('id, title, brand, image_url')
         .in('id', productIds);
       const productById = new Map((productsData ?? []).map((p) => [p.id, p]));
       products = (variantsData ?? []).map((v) => ({
         title: productById.get(v.product_id)?.title ?? '商品名未設定',
         brand: productById.get(v.product_id)?.brand ?? null,
+        imageUrl: v.image_url ?? productById.get(v.product_id)?.image_url ?? null,
         sku: v.sku,
         size: v.size,
         color: v.color,
@@ -158,14 +166,30 @@ export function CampaignDetailContent({
       <Text className="font-heading text-title text-ink mb-4">{campaign.title}</Text>
 
       {campaign.products.map((p, index) => (
-        <View key={index} className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2">
-          <Text className="font-body-medium text-body text-ink">
-            {p.brand ? `${p.brand} ` : ''}
-            {p.title}
-          </Text>
-          <Text className="font-body text-caption text-ink-soft">
-            {[p.sku, p.size, p.color].filter(Boolean).join(' / ') || 'SKU未設定'}
-          </Text>
+        <View
+          key={index}
+          className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2 flex-row"
+          style={{ gap: 12 }}
+        >
+          {p.imageUrl ? (
+            <Image source={{ uri: p.imageUrl }} style={{ width: 64, height: 64, borderRadius: 10 }} />
+          ) : (
+            <View
+              style={{ width: 64, height: 64, borderRadius: 10 }}
+              className="bg-line items-center justify-center"
+            >
+              <Text className="font-body text-tiny text-ink-soft">No Image</Text>
+            </View>
+          )}
+          <View className="flex-1 justify-center">
+            <Text className="font-body-medium text-body text-ink">
+              {p.brand ? `${p.brand} ` : ''}
+              {p.title}
+            </Text>
+            <Text className="font-body text-caption text-ink-soft">
+              {[p.sku, p.size, p.color].filter(Boolean).join(' / ') || 'SKU未設定'}
+            </Text>
+          </View>
         </View>
       ))}
 
