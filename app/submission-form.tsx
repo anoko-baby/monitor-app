@@ -301,6 +301,10 @@ export function SubmissionFormContent({ taskId }: { taskId: string }) {
       );
       setPendingFiles(restoredFiles);
       sequenceCounterRef.current = existingCount + restoredFiles.length;
+      // アップロード中に再ログイン・再読み込みされた場合、下書きから復元されたファイルは
+      // 「待機中」に戻すだけで誰も処理を再開しないまま止まってしまっていた(実機フィードバック:
+      // 「待機中のままでどうにもならない」)。復元直後に処理を再開する。
+      restoredFiles.filter((f) => f.status === 'pending').forEach((f) => startProcessing(f));
     } else {
       sequenceCounterRef.current = existingCount;
     }
