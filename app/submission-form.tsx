@@ -22,7 +22,7 @@ import { goBackOrReplace } from '../lib/navigation';
 import { supabase } from '../lib/supabase';
 import { clearDraft, DraftFile, loadDraft, saveDraft } from '../lib/submissionDraft';
 
-const MAX_PHOTOS = 30;
+const MAX_PHOTOS = 50;
 const MAX_PHOTO_SIZE = 50 * 1024 * 1024;
 const MAX_VIDEOS = 5;
 const MAX_VIDEO_SIZE = 2 * 1024 * 1024 * 1024;
@@ -402,12 +402,16 @@ export function SubmissionFormContent({ taskId }: { taskId: string }) {
       return;
     }
 
-    const existingCount = existingFiles.filter((f) => f.kind === kind).length;
+    // 上限は「1回の提出あたり」の枚数(既に提出済みのファイルは数えない)。超える分は、
+    // 一旦ここまでで提出したうえで、追加提出(何度でも可)で分けて提出してもらう想定
+    // (実機フィードバック: 上限に関する問い合わせを減らすため、その旨を案内するメッセージにした)。
     const pendingCount = pendingFiles.filter((f) => f.kind === kind && f.status !== 'error').length;
     const max = kind === 'photo' ? MAX_PHOTOS : MAX_VIDEOS;
-    const remaining = max - existingCount - pendingCount;
+    const remaining = max - pendingCount;
     if (remaining <= 0) {
-      setSubmitError(`${kind === 'photo' ? '写真' : '動画'}は1回次あたり最大${max}点までです`);
+      setSubmitError(
+        `${kind === 'photo' ? '写真' : '動画'}は1回の提出あたり最大${max}点までです。超える分は、一旦ここまでで提出のうえ、追加提出で分けてご提出ください`
+      );
       return;
     }
 
