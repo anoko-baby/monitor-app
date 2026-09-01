@@ -685,6 +685,13 @@ Dropbox連携先の切り替え作業中に試行された提出ファイル(`IM
 - `supabase/migrations/20260827000001_allow_thumbnail_upload_after_approval.sql`で、他のテーブルと同様approvedを許可・cancelledのみブロックする条件に揃えた
 - `npx tsc --noEmit`通過。**要マイグレーション適用(`npx supabase db push`)**。Edge Functionの変更は無い
 
+## 写真の提出枚数上限を30枚→50枚に引き上げ(2026-08-26)
+
+- 実機フィードバック: 「1回30枚までという制限がある?問い合わせが来ている」。上限を50枚に引き上げることで合意
+- `app/submission-form.tsx`の`MAX_PHOTOS`定数を30→50に変更。動画の上限(5本)・サイズ上限(写真50MB/動画2GB)は変更なし
+- `app_settings.upload_limits`(現状コードから未参照だが将来の設定画面実装時のため)の`max_photos`も50に更新
+- `npx tsc --noEmit`通過。**要マイグレーション適用(`npx supabase db push`)**。Edge Functionの変更は無い
+
 ---
 
 ## 未確定・要確認事項の記録

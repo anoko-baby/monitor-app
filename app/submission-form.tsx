@@ -22,7 +22,7 @@ import { goBackOrReplace } from '../lib/navigation';
 import { supabase } from '../lib/supabase';
 import { clearDraft, DraftFile, loadDraft, saveDraft } from '../lib/submissionDraft';
 
-const MAX_PHOTOS = 30;
+const MAX_PHOTOS = 50;
 const MAX_PHOTO_SIZE = 50 * 1024 * 1024;
 const MAX_VIDEOS = 5;
 const MAX_VIDEO_SIZE = 2 * 1024 * 1024 * 1024;
