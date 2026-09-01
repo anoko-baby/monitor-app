@@ -1,5 +1,6 @@
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Image, Text, View } from 'react-native';
+import { FlatList, Image, Pressable, Text, View } from 'react-native';
 
 import { BottomTabBar } from '../components/BottomTabBar';
 import { ErrorBanner } from '../components/ErrorBanner';
@@ -147,7 +148,15 @@ export default function SubmissionHistory() {
           ) : null
         }
         renderItem={({ item }) => (
-          <View className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2 flex-row items-center">
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: item.type === 'media' ? '/submission-form' : '/sns-submission-form',
+                params: { taskId: item.taskId },
+              })
+            }
+            className="bg-surface rounded-card border-hairline border-line px-4 py-3 mb-2 flex-row items-center"
+          >
             {item.thumbUrl ? (
               <Image
                 source={{ uri: item.thumbUrl }}
@@ -171,7 +180,7 @@ export default function SubmissionHistory() {
               </Text>
               <Text className="font-body text-tiny text-ink-soft">{formatDate(item.submittedAt)}</Text>
             </View>
-          </View>
+          </Pressable>
         )}
       />
       </View>
